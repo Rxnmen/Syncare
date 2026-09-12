@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
+import { useWellnessStore } from "@/lib/wellness-store";
 import { locations } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/health")({
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/health")({
 type LocationItem = (typeof locations)[number];
 
 function HealthPage() {
+  const { healthRecords } = useWellnessStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
@@ -311,18 +313,14 @@ function HealthPage() {
                     </div>
                   </div>
                   <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success border border-success/20">
-                    3 Verified
+                    {healthRecords.length} Verified
                   </span>
                 </div>
 
                 <div className="mt-5 space-y-2.5">
-                  {[
-                    { name: "COVID-19 Booster", date: "Verified Oct 2025" },
-                    { name: "Tetanus Toxoid (Tdap)", date: "Valid until 2029" },
-                    { name: "Hepatitis B (3/3)", date: "Fully immunized" },
-                  ].map((item) => (
+                  {healthRecords.map((item) => (
                     <div
-                      key={item.name}
+                      key={item.id}
                       className="flex items-center justify-between rounded-xl bg-muted/40 p-3.5 border border-border/40 transition-colors hover:bg-muted/70"
                     >
                       <div>
@@ -331,7 +329,7 @@ function HealthPage() {
                       </div>
                       <span className="flex items-center gap-1 text-xs font-semibold text-success">
                         <ShieldCheck className="size-4" />
-                        Valid
+                        {item.status}
                       </span>
                     </div>
                   ))}

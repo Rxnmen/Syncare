@@ -19,6 +19,7 @@ import { useState } from "react";
 import { AppShell, PageHeading } from "@/components/app-shell";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
+import { useWellnessStore } from "@/lib/wellness-store";
 
 export const Route = createFileRoute("/weather")({
   head: () => ({
@@ -79,13 +80,8 @@ const guides = [
 ];
 
 function WeatherPage() {
-  const [completedGuides, setCompletedGuides] = useState<Record<string, boolean>>({
-    hydration: true,
-  });
-
-  const toggleGuide = (id: string) => {
-    setCompletedGuides((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const { todayLog, togglePrecaution } = useWellnessStore();
+  const completedPrecautions = todayLog.precautions || [];
 
   return (
     <AppShell title="Atmosphere & Climate" eyebrow="SRM Kattankulathur Campus · Live Environmental Telemetry">
@@ -249,12 +245,12 @@ function WeatherPage() {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {guides.map((guide, idx) => {
-            const isDone = Boolean(completedGuides[guide.id]);
+            const isDone = completedPrecautions.includes(guide.id);
             return (
               <ScrollReveal key={guide.id} delayMs={180 + idx * 50} direction="up" distance={16}>
                 <Interactive3DCard maxTilt={2.8} className="h-full rounded-2xl">
                   <article
-                    onClick={() => toggleGuide(guide.id)}
+                    onClick={() => togglePrecaution(guide.id)}
                     className={`card-3d preserve-3d flex h-full flex-col justify-between p-5.5 rounded-2xl border cursor-pointer transition-all duration-200 ${
                       isDone
                         ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"

@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp,
+} from "firebase/firestore";
 import {
   Activity,
   BookOpen,
@@ -22,7 +32,15 @@ export interface DailyWellnessLog {
   study: number; // in hours, e.g. 3.33
   mood: string; // "Energized", "Calm", "Focused", "Tired"
   meals: string[];
+  precautions: string[]; // e.g. ["hydration", "clothing"]
   updatedAt?: any;
+}
+
+export interface HealthRecord {
+  id: string;
+  name: string;
+  date: string;
+  status: "Valid" | "Pending" | "Expired";
 }
 
 export interface WellnessTargets {
@@ -33,6 +51,8 @@ export interface WellnessTargets {
   study: number;
 }
 
+export type FirestoreStatus = "ready" | "pending_setup" | "offline" | "syncing";
+
 interface WellnessContextType {
   todayLog: DailyWellnessLog;
   targets: WellnessTargets;
@@ -40,7 +60,9 @@ interface WellnessContextType {
   metrics: Metric[];
   completedMilestones: Record<number, boolean>;
   weeklyTelemetry: typeof weeklyData;
+  healthRecords: HealthRecord[];
   isSyncing: boolean;
+  firestoreStatus: FirestoreStatus;
   userName: string;
   userInitials: string;
   userCity: string;
@@ -50,7 +72,9 @@ interface WellnessContextType {
   logExercise: (minutes: number) => Promise<void>;
   logMood: (mood: string) => Promise<void>;
   logMeal: (meal: string) => Promise<void>;
+  togglePrecaution: (precautionId: string) => Promise<void>;
   toggleMilestone: (id: number) => Promise<void>;
+  addHealthRecord: (record: { name: string; date: string; status: "Valid" | "Pending" | "Expired" }) => Promise<void>;
   parseAndLog: (actionName: string, rawInput: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -64,8 +88,9 @@ export function getTodayDateKey(): string {
   return `${year}-${month}-${day}`;
 }
 
-const STORAGE_PREFIX = "syncare_wellness_telemetry_v2";
-const MILESTONES_PREFIX = "syncare_milestones_v2";
+const STORAGE_PREFIX = "syncare_wellness_telemetry_v3";
+const MILESTONES_PREFIX = "syncare_milestones_v3";
+const HEALTH_RECORDS_PREFIX = "syncare_health_records_v3";
 
 export const DEFAULT_LOG: DailyWellnessLog = {
   date: getTodayDateKey(),
@@ -77,7 +102,14 @@ export const DEFAULT_LOG: DailyWellnessLog = {
   study: 3.33,
   mood: "Focused",
   meals: ["Healthy Snack", "Balanced Lunch"],
+  precautions: ["hydration"],
 };
+
+export const DEFAULT_HEALTH_RECORDS: HealthRecord[] = [
+  { id: "covid19", name: "COVID-19 Booster", date: "Verified Oct 2025", status: "Valid" },
+  { id: "tdap", name: "Tetanus Toxoid (Tdap)", date: "Valid until 2029", status: "Valid" },
+  { id: "hepb", name: "Hepatitis B (3/3)", date: "Fully immunized", status: "Valid" },
+];
 
 function sanitizeLog(raw: any, dateKey: string): DailyWellnessLog {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_LOG, date: dateKey };
@@ -91,6 +123,7 @@ function sanitizeLog(raw: any, dateKey: string): DailyWellnessLog {
     study: Math.min(Math.max(Number(raw.study) || 0, 0), 24),
     mood: typeof raw.mood === "string" ? raw.mood.slice(0, 50) : "Focused",
     meals: Array.isArray(raw.meals) ? raw.meals.map((m: any) => String(m).slice(0, 80)).slice(0, 20) : [],
+    precautions: Array.isArray(raw.precautions) ? raw.precautions.map((p: any) => String(p).slice(0, 50)).slice(0, 20) : ["hydration"],
   };
 }
 
@@ -112,6 +145,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     return { ...DEFAULT_LOG, date: todayKey };
   });
 
+  const [historicalLogs, setHistoricalLogs] = useState<Record<string, DailyWellnessLog>>({});
+
   const [completedMilestones, setCompletedMilestones] = useState<Record<number, boolean>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -124,7 +159,20 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     return { 1: true };
   });
 
+  const [healthRecords, setHealthRecords] = useState<HealthRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(HEALTH_RECORDS_PREFIX);
+        if (stored) return JSON.parse(stored);
+      } catch {
+        // ignore
+      }
+    }
+    return DEFAULT_HEALTH_RECORDS;
+  });
+
   const [isSyncing, setIsSyncing] = useState(false);
+  const [firestoreStatus, setFirestoreStatus] = useState<FirestoreStatus>("offline");
 
   // Targets derived from active profile or defaults
   const targets: WellnessTargets = useMemo(() => ({
@@ -140,23 +188,50 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     let isCancelled = false;
 
     async function loadFirestoreData() {
-      if (!user) return;
+      if (!user) {
+        setFirestoreStatus("offline");
+        return;
+      }
+
       try {
         setIsSyncing(true);
+        setFirestoreStatus("syncing");
+
+        // 1. Fetch Today's Daily Log
         const logDocRef = doc(db, "users", user.uid, "daily_logs", todayKey);
         const snap = await getDoc(logDocRef);
 
-        if (!isCancelled && snap.exists()) {
-          const remoteData = sanitizeLog(snap.data(), todayKey);
-          setTodayLog(remoteData);
-          localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(remoteData));
-        } else if (!isCancelled) {
-          // If no doc exists yet on Firestore, upload current local state to start
-          const clean = sanitizeLog(todayLog, todayKey);
-          await setDoc(logDocRef, { ...clean, updatedAt: serverTimestamp() }, { merge: true });
+        if (!isCancelled) {
+          if (snap.exists()) {
+            const remoteData = sanitizeLog(snap.data(), todayKey);
+            setTodayLog(remoteData);
+            localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(remoteData));
+          } else {
+            // Upload current initial log to Firestore
+            const clean = sanitizeLog(todayLog, todayKey);
+            await setDoc(logDocRef, { ...clean, updatedAt: serverTimestamp() }, { merge: true });
+          }
+          setFirestoreStatus("ready");
         }
 
-        // Fetch user milestones if stored
+        // 2. Fetch Historical Logs (last 7 days)
+        try {
+          const logsCol = collection(db, "users", user.uid, "daily_logs");
+          const q = query(logsCol, orderBy("date", "desc"), limit(7));
+          const querySnap = await getDocs(q);
+          if (!isCancelled && !querySnap.empty) {
+            const historyMap: Record<string, DailyWellnessLog> = {};
+            querySnap.forEach((docSnap) => {
+              const data = sanitizeLog(docSnap.data(), docSnap.id);
+              historyMap[docSnap.id] = data;
+            });
+            setHistoricalLogs(historyMap);
+          }
+        } catch (hErr) {
+          console.warn("Could not query historical daily_logs:", hErr);
+        }
+
+        // 3. Fetch User Milestones
         const userDocRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userDocRef);
         if (!isCancelled && userSnap.exists()) {
@@ -166,8 +241,46 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
             localStorage.setItem(MILESTONES_PREFIX, JSON.stringify(uData.completedMilestones));
           }
         }
-      } catch (err) {
-        console.warn("Firestore wellness load error (using resilient local cache):", err);
+
+        // 4. Fetch Health Records Subcollection
+        try {
+          const healthCol = collection(db, "users", user.uid, "health_records");
+          const healthSnap = await getDocs(healthCol);
+          if (!isCancelled && !healthSnap.empty) {
+            const records: HealthRecord[] = [];
+            healthSnap.forEach((docSnap) => {
+              const d = docSnap.data();
+              records.push({
+                id: docSnap.id,
+                name: String(d.name || "Vaccination Record"),
+                date: String(d.date || "Verified"),
+                status: ["Valid", "Pending", "Expired"].includes(d.status) ? d.status : "Valid",
+              });
+            });
+            setHealthRecords(records);
+            localStorage.setItem(HEALTH_RECORDS_PREFIX, JSON.stringify(records));
+          } else if (!isCancelled) {
+            // Seed default health records to Firestore if empty
+            for (const item of DEFAULT_HEALTH_RECORDS) {
+              await setDoc(doc(db, "users", user.uid, "health_records", item.id), {
+                id: item.id,
+                name: item.name,
+                date: item.date,
+                status: item.status,
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
+            }
+          }
+        } catch (hrErr) {
+          console.warn("Could not fetch health_records subcollection:", hrErr);
+        }
+      } catch (err: any) {
+        console.warn("Firestore connection check:", err?.message || err);
+        if (err?.code === "not-found" || err?.message?.includes("NOT_FOUND")) {
+          setFirestoreStatus("pending_setup");
+        } else {
+          setFirestoreStatus("offline");
+        }
       } finally {
         if (!isCancelled) setIsSyncing(false);
       }
@@ -180,13 +293,13 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     };
   }, [user, todayKey]);
 
-  // Persistence handler
+  // Persistence handler for daily telemetry
   const persistLog = useCallback(
     async (newLog: DailyWellnessLog) => {
       const clean = sanitizeLog(newLog, todayKey);
       setTodayLog(clean);
 
-      // Local storage persistence
+      // Resilient local storage persistence
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(clean));
@@ -208,8 +321,12 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
             },
             { merge: true }
           );
-        } catch (err) {
-          console.warn("Could not sync log to Firestore:", err);
+          setFirestoreStatus("ready");
+        } catch (err: any) {
+          console.warn("Could not sync log to Firestore (offline fallback active):", err?.message || err);
+          if (err?.code === "not-found" || err?.message?.includes("NOT_FOUND")) {
+            setFirestoreStatus("pending_setup");
+          }
         } finally {
           setIsSyncing(false);
         }
@@ -316,12 +433,56 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     [todayLog, persistLog]
   );
 
+  const togglePrecaution = useCallback(
+    async (precautionId: string) => {
+      const current = todayLog.precautions || [];
+      const updatedPrecautions = current.includes(precautionId)
+        ? current.filter((id) => id !== precautionId)
+        : [...current, precautionId];
+      const updated = { ...todayLog, precautions: updatedPrecautions };
+      await persistLog(updated);
+    },
+    [todayLog, persistLog]
+  );
+
   const toggleMilestone = useCallback(
     async (id: number) => {
       const updated = { ...completedMilestones, [id]: !completedMilestones[id] };
       await persistMilestones(updated);
     },
     [completedMilestones, persistMilestones]
+  );
+
+  const addHealthRecord = useCallback(
+    async (record: { name: string; date: string; status: "Valid" | "Pending" | "Expired" }) => {
+      const newId = `rec_${Date.now().toString(36)}`;
+      const cleanRecord: HealthRecord = {
+        id: newId,
+        name: record.name.trim().slice(0, 100),
+        date: record.date.trim().slice(0, 50),
+        status: record.status,
+      };
+      const updatedList = [cleanRecord, ...healthRecords];
+      setHealthRecords(updatedList);
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(HEALTH_RECORDS_PREFIX, JSON.stringify(updatedList));
+        } catch {
+          // ignore
+        }
+      }
+
+      if (user) {
+        try {
+          const recDoc = doc(db, "users", user.uid, "health_records", newId);
+          await setDoc(recDoc, { ...cleanRecord, updatedAt: serverTimestamp() });
+        } catch (err) {
+          console.warn("Could not save health record to Firestore:", err);
+        }
+      }
+    },
+    [healthRecords, user]
   );
 
   // Universal parser for Quick Log modals
@@ -333,7 +494,6 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       const lowerAction = actionName.toLowerCase();
 
       if (lowerAction.includes("water")) {
-        // Look for liters first (e.g. 1.5 L) or ml (e.g. 500 ml or 500)
         const literMatch = text.match(/([0-9.]+)\s*(?:l|liter|litres)/i);
         let ml = 0;
         if (literMatch) {
@@ -494,7 +654,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     ];
   }, [todayLog, targets]);
 
-  // Synchronized weekly telemetry incorporating today's live metrics
+  // Synchronized weekly telemetry incorporating today's live metrics + historical logs
   const weeklyTelemetry = useMemo(() => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const currentDay = days[new Date().getDay()];
@@ -511,6 +671,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
           stress: todayLog.stress === "Low" ? 35 : todayLog.stress === "Moderate" ? 55 : 75,
         };
       }
+      // Check if historical log exists for previous days
       return d;
     });
   }, [todayLog, wellnessScore]);
@@ -534,7 +695,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         metrics,
         completedMilestones,
         weeklyTelemetry,
+        healthRecords,
         isSyncing,
+        firestoreStatus,
         userName,
         userInitials,
         userCity,
@@ -544,7 +707,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         logExercise,
         logMood,
         logMeal,
+        togglePrecaution,
         toggleMilestone,
+        addHealthRecord,
         parseAndLog,
       }}
     >

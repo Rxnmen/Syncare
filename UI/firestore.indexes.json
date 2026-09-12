@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "daily_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
