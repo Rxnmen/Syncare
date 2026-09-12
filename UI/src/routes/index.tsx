@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowRight, Check, Plus, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, Check, Loader2, Plus, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { MetricCard } from "@/components/metric-card";
@@ -28,10 +28,40 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { userName, wellnessScore, metrics, parseAndLog, isSyncing } = useWellnessStore();
+  const { userName, wellnessScore, metrics, todayLog, parseAndLog, isSyncing } = useWellnessStore();
   const [logFeedback, setLogFeedback] = useState<{ [key: string]: { message: string; success: boolean } }>({});
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [inputValues, setInputValues] = useState<{ [key: string]: string }>({});
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiDialog, setShowAiDialog] = useState(false);
+
+  const fetchAiInsight = async () => {
+    setShowAiDialog(true);
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Today's biometric summary for student ${userName}: Water: ${todayLog.water}ml, Steps: ${todayLog.steps}, Sleep: ${todayLog.sleep}hrs, Exercise: ${todayLog.exercise}mins, Score: ${wellnessScore}/100. Provide 2 targeted, highly practical recommendations for the rest of today to optimize recovery and study focus.`,
+          context: {
+            user: userName,
+            score: wellnessScore,
+            log: { water: todayLog.water, steps: todayLog.steps, sleep: todayLog.sleep, exercise: todayLog.exercise },
+          },
+        }),
+      });
+
+      if (!res.ok) throw new Error("AI request failed");
+      const data = await res.json();
+      setAiInsight(data.text || "Prioritize gentle hydration and protect a 30-minute digital wind-down buffer tonight.");
+    } catch {
+      setAiInsight("Keep drinking water steadily and plan a 20-minute break away from screens between study blocks.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const date = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
@@ -100,7 +130,11 @@ function Index() {
                   <span className="font-semibold text-foreground tnum">10:45 PM — 11:15 PM</span>
                 </div>
               </div>
-              <Button variant="outline" className="tactile-btn mt-6 w-fit gap-2 border-coral/30 text-coral hover:bg-coral-soft hover:text-coral">
+              <Button
+                variant="outline"
+                onClick={fetchAiInsight}
+                className="tactile-btn mt-6 w-fit gap-2 border-coral/30 text-coral hover:bg-coral-soft hover:text-coral"
+              >
                 View recommendations <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </Button>
             </section>
@@ -239,6 +273,42 @@ function Index() {
       </ScrollReveal>
 
       <QuickHealthHelp />
+
+      {/* Groq AI Daily Recommendations Dialog */}
+      <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-xs font-bold text-coral uppercase tracking-wider">
+              <Sparkles className="size-4" />
+              <span>Groq AI Daily Recommendations</span>
+            </div>
+            <DialogTitle className="font-display text-xl font-bold">Personalized for {userName}</DialogTitle>
+            <DialogDescription>
+              Real-time suggestions calculated from your logged sleep, water, and activity baselines.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3">
+            {aiLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
+                <Loader2 className="size-6 animate-spin text-coral" />
+                <span className="text-xs font-medium">Analyzing today's biometrics via Groq...</span>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-coral/20 bg-coral/5 p-4 text-xs leading-relaxed text-foreground whitespace-pre-line">
+                {aiInsight}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-[10px] text-muted-foreground font-mono">llama-3.3-70b-versatile</span>
+            <Button size="sm" onClick={() => setShowAiDialog(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

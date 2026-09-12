@@ -56,6 +56,7 @@ jspm_packages/
 dist/
 dist-ssr/
 .output/
+.vercel/
 .vinxi/
 .tanstack/
 .nitro/

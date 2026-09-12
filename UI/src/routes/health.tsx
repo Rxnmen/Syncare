@@ -24,6 +24,8 @@ import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { useWellnessStore } from "@/lib/wellness-store";
 import { locations } from "@/lib/mock-data";
+import { CareMap } from "@/components/care-map";
+import { useResolvedLocation } from "@/lib/location-service";
 
 export const Route = createFileRoute("/health")({
   head: () => ({
@@ -43,6 +45,7 @@ type LocationItem = (typeof locations)[number];
 
 function HealthPage() {
   const { healthRecords } = useWellnessStore();
+  const userLocation = useResolvedLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
@@ -59,8 +62,10 @@ function HealthPage() {
     return matchesCategory && matchesSearch;
   });
 
+  const campusTitle = userLocation.displayName.split(",")[0] || "SRM Kattankulathur";
+
   return (
-    <AppShell title="Health & Care Radar" eyebrow="Healthcare around Campus · SRM Kattankulathur">
+    <AppShell title="Health & Care Radar" eyebrow={`Healthcare around Campus · ${campusTitle}`}>
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
           title="Care, when you need it"
@@ -119,117 +124,17 @@ function HealthPage() {
             </div>
           </ScrollReveal>
 
-          {/* Architectural Radar Map Screen */}
+          {/* Architectural OpenStreetMap Radar Map Screen */}
           <ScrollReveal direction="up" delayMs={120} distance={16}>
             <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border/80 bg-slate-950 text-slate-100 shadow-3d-elevated select-none">
-              {/* SVG Grid Background */}
-              <svg className="absolute inset-0 size-full opacity-20 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <pattern id="radarGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#10b981" strokeWidth="0.5" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#radarGrid)" />
-              </svg>
-
-              {/* Concentric Range Rings */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="size-[140px] rounded-full border border-emerald-500/20" />
-                <div className="size-[280px] rounded-full border border-emerald-500/15" />
-                <div className="size-[420px] rounded-full border border-emerald-500/10" />
-                {/* Distance Labels */}
-                <span className="absolute top-[49%] right-[22%] text-[9px] font-mono text-emerald-400/50 uppercase tracking-widest">
-                  1.0 KM
-                </span>
-                <span className="absolute top-[49%] right-[6%] text-[9px] font-mono text-emerald-400/40 uppercase tracking-widest">
-                  2.5 KM
-                </span>
-              </div>
-
-              {/* Radar Crosshairs */}
-              <div className="absolute left-1/2 top-0 h-full w-[1px] bg-gradient-to-b from-transparent via-emerald-500/20 to-transparent pointer-events-none" />
-              <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent pointer-events-none" />
-
-              {/* Animated Radar Sweep Beam */}
-              <div
-                className="absolute inset-0 origin-center pointer-events-none animate-[radar-sweep_6s_linear_infinite]"
-                style={{
-                  background: "conic-gradient(from 0deg at 50% 50%, rgba(16, 185, 129, 0.22) 0deg, transparent 60deg, transparent 360deg)",
-                }}
+              <CareMap
+                centerLat={userLocation.lat}
+                centerLon={userLocation.lon}
+                centerLabel={userLocation.displayName}
+                locations={filteredLocations}
+                selectedLocationName={hoveredLocation || directionsTarget?.name}
+                onSelectLocation={(place) => setDirectionsTarget(place)}
               />
-
-              {/* Campus Central Hub (Origin) */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
-                <div className="relative flex items-center justify-center">
-                  <span className="absolute size-7 rounded-full bg-emerald-400/30 animate-ping" />
-                  <span className="relative grid size-5 place-items-center rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] shadow-[0_0_15px_#10b981]">
-                    C
-                  </span>
-                </div>
-                <span className="mt-1 rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-300 border border-emerald-500/30 backdrop-blur-xs">
-                  SRM Arch Gate · Kattankulathur
-                </span>
-              </div>
-
-              {/* Facility Markers */}
-              {locations.map((place) => {
-                const isHovered = hoveredLocation === place.name;
-                const isSelected = directionsTarget?.name === place.name;
-                return (
-                  <div
-                    key={place.name}
-                    onMouseEnter={() => setHoveredLocation(place.name)}
-                    onMouseLeave={() => setHoveredLocation(null)}
-                    onClick={() => setDirectionsTarget(place)}
-                    className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 transition-all duration-300"
-                    style={{ left: place.x, top: place.y }}
-                  >
-                    <div className="relative flex flex-col items-center">
-                      {/* Pulse Ring when Active */}
-                      {(isHovered || isSelected) && (
-                        <span className="absolute -inset-2 rounded-full bg-rose-500/40 animate-ping" />
-                      )}
-
-                      {/* Map Pin Pill */}
-                      <span
-                        className={`grid size-9 place-items-center rounded-full border-2 transition-all duration-300 ${
-                          isHovered || isSelected
-                            ? "bg-rose-500 border-white text-white scale-125 shadow-[0_0_20px_rgba(244,63,94,0.8)]"
-                            : "bg-slate-900 border-emerald-400/80 text-emerald-300 shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:border-rose-400 group-hover:text-rose-400"
-                        }`}
-                      >
-                        <MapPin className="size-4" />
-                      </span>
-
-                      {/* Hover Tooltip Card */}
-                      <div
-                        className={`absolute bottom-11 whitespace-nowrap rounded-xl bg-slate-900/95 px-3 py-1.5 text-xs shadow-2xl border border-slate-700 backdrop-blur-md transition-all duration-200 pointer-events-none ${
-                          isHovered ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-1 scale-95"
-                        }`}
-                      >
-                        <p className="font-semibold text-white">{place.name}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-300">
-                          <span className={place.open ? "text-emerald-400" : "text-rose-400"}>
-                            {place.open ? "● Open Now" : "● Closed"}
-                          </span>
-                          <span>• {place.distance}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Architectural HUD Overlay */}
-              <div className="absolute top-4 left-4 flex items-center gap-2 rounded-lg bg-slate-900/85 px-3 py-1.5 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-500/20 backdrop-blur-md">
-                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>RADAR 12.8230° N, 80.0444° E · SRM KTR</span>
-              </div>
-
-              <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-lg bg-slate-900/85 px-3 py-1.5 text-[11px] font-mono text-slate-300 border border-slate-700 backdrop-blur-md">
-                <Compass className="size-3.5 text-emerald-400" />
-                <span>{filteredLocations.length} Facilities Active</span>
-              </div>
             </div>
           </ScrollReveal>
 

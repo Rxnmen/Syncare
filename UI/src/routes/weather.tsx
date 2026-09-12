@@ -20,6 +20,8 @@ import { AppShell, PageHeading } from "@/components/app-shell";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { useWellnessStore } from "@/lib/wellness-store";
+import { useResolvedLocation } from "@/lib/location-service";
+import { useWeatherTelemetry } from "@/lib/weather-service";
 
 export const Route = createFileRoute("/weather")({
   head: () => ({
@@ -35,14 +37,14 @@ export const Route = createFileRoute("/weather")({
   component: WeatherPage,
 });
 
-const hourlyForecast = [
-  { time: "Now", temp: "34°", icon: CloudSun, condition: "Mostly Sunny", heatRisk: "Moderate" },
-  { time: "12 PM", temp: "35°", icon: Sun, condition: "Peak Heat", heatRisk: "High" },
-  { time: "2 PM", temp: "35°", icon: Sun, condition: "Intense UV", heatRisk: "Extreme" },
-  { time: "4 PM", temp: "33°", icon: CloudSun, condition: "Easing", heatRisk: "Moderate" },
-  { time: "6 PM", temp: "30°", icon: CloudSun, condition: "Breeze", heatRisk: "Low" },
-  { time: "8 PM", temp: "28°", icon: CloudSun, condition: "Pleasant", heatRisk: "Low" },
-];
+function getWeatherIcon(code: number) {
+  if (code === 0) return Sun;
+  if (code <= 3) return CloudSun;
+  if ([45, 48].includes(code)) return CloudSun;
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return Droplets;
+  if ([95, 96, 99].includes(code)) return AlertTriangle;
+  return Sun;
+}
 
 const guides = [
   {
@@ -80,11 +82,16 @@ const guides = [
 ];
 
 function WeatherPage() {
+  const userLocation = useResolvedLocation();
+  const weather = useWeatherTelemetry(userLocation.lat, userLocation.lon);
   const { todayLog, togglePrecaution } = useWellnessStore();
   const completedPrecautions = todayLog.precautions || [];
 
+  const WeatherHeroIcon = getWeatherIcon(weather.weatherCode);
+  const campusLabel = userLocation.displayName.split(",")[0] || "SRM Kattankulathur";
+
   return (
-    <AppShell title="Atmosphere & Climate" eyebrow="SRM Kattankulathur Campus · Live Environmental Telemetry">
+    <AppShell title="Atmosphere & Climate" eyebrow={`${campusLabel} Campus · Live Environmental Telemetry`}>
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
           title="Plan well for the day outside"
@@ -92,7 +99,7 @@ function WeatherPage() {
           action={
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
               <Sun className="size-4 animate-spin [animation-duration:12s]" />
-              <span>Solar Index: UV 8 (High)</span>
+              <span>Solar Index: UV {weather.uvIndex} ({weather.uvIndex >= 8 ? "Very High" : weather.uvIndex >= 6 ? "High" : weather.uvIndex >= 3 ? "Moderate" : "Low"})</span>
             </div>
           }
         />
@@ -109,23 +116,25 @@ function WeatherPage() {
             <div className="relative z-10 grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-center">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1 text-xs font-semibold backdrop-blur-md border border-white/20">
-                  <CloudSun className="size-4" />
-                  <span>Mostly Sunny · Coastal Warmth</span>
+                  <WeatherHeroIcon className="size-4" />
+                  <span>{weather.condition} · {weather.conditionSub}</span>
                 </div>
 
                 <div className="mt-6 flex items-baseline gap-5">
                   <span className="tnum font-display text-7xl md:text-8xl font-black tracking-tighter drop-shadow-sm">
-                    34°
+                    {weather.temperature}°
                   </span>
                   <div className="space-y-1 text-sm text-white/85">
-                    <p className="font-semibold text-white">Feels like 38°C</p>
-                    <p className="text-white/70">High 35° · Low 27°</p>
-                    <p className="text-xs text-white/60">Dew Point 24° · Sea Breeze 14 km/h</p>
+                    <p className="font-semibold text-white">Feels like {weather.feelsLike}°C</p>
+                    <p className="text-white/70">High {weather.tempMax}° · Low {weather.tempMin}°</p>
+                    <p className="text-xs text-white/60">Wind {weather.windSpeed} km/h · Updated {weather.updatedAt}</p>
                   </div>
                 </div>
 
                 <p className="mt-5 max-w-lg text-sm leading-relaxed text-white/85">
-                  High thermal radiance with moderate coastal humidity. Peak heat exhaustion risk occurs between 12:30 PM and 3:45 PM.
+                  {weather.uvIndex >= 7
+                    ? "High solar radiance with tropical campus warmth. Peak heat exhaustion risk occurs between 12:00 PM and 3:30 PM."
+                    : "Moderate atmospheric conditions across campus. Favorable window for lecture transitions and outdoor student activity."}
                 </p>
               </div>
 
@@ -134,23 +143,23 @@ function WeatherPage() {
                 {[
                   {
                     icon: Droplets,
-                    val: "71%",
+                    val: `${weather.humidity}%`,
                     label: "Humidity",
-                    sub: "Coastal humid",
+                    sub: weather.humidity >= 70 ? "Humid tropical" : "Optimal",
                     color: "text-cyan-200",
                   },
                   {
                     icon: Sun,
-                    val: "8.2",
+                    val: `${weather.uvIndex}`,
                     label: "UV Index",
-                    sub: "Peak Protection",
+                    sub: weather.uvIndex >= 8 ? "Extreme Defense" : weather.uvIndex >= 6 ? "High Protection" : "Moderate",
                     color: "text-amber-200",
                   },
                   {
                     icon: Wind,
-                    val: "62",
+                    val: `${weather.aqi}`,
                     label: "AQI",
-                    sub: "Moderate",
+                    sub: weather.aqi <= 50 ? "Good" : weather.aqi <= 100 ? "Moderate" : "Sensitive",
                     color: "text-emerald-200",
                   },
                 ].map((item) => (
@@ -174,30 +183,33 @@ function WeatherPage() {
             {/* Hourly Weather Strip */}
             <div className="relative z-10 mt-8 pt-6 border-t border-white/15">
               <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-3">
-                Campus Hourly Temperature & Heat Gradient
+                Campus Hourly Forecast & Heat Risk Gradient
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                {hourlyForecast.map((hour) => (
-                  <div
-                    key={hour.time}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs hover:bg-white/10 transition-colors"
-                  >
-                    <span className="text-[11px] font-medium text-white/75">{hour.time}</span>
-                    <hour.icon className="size-4.5 my-1.5 text-amber-200" />
-                    <span className="tnum font-display text-sm font-bold text-white">{hour.temp}</span>
-                    <span
-                      className={`mt-1 rounded px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider ${
-                        hour.heatRisk === "Extreme"
-                          ? "bg-rose-500/40 text-rose-100"
-                          : hour.heatRisk === "High"
-                          ? "bg-amber-500/40 text-amber-100"
-                          : "bg-emerald-500/30 text-emerald-100"
-                      }`}
+                {weather.hourly.map((hour) => {
+                  const HourIcon = getWeatherIcon(hour.code);
+                  return (
+                    <div
+                      key={hour.time}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs hover:bg-white/10 transition-colors"
                     >
-                      {hour.heatRisk}
-                    </span>
-                  </div>
-                ))}
+                      <span className="text-[11px] font-medium text-white/75">{hour.time}</span>
+                      <HourIcon className="size-4.5 my-1.5 text-amber-200" />
+                      <span className="tnum font-display text-sm font-bold text-white">{hour.temp}</span>
+                      <span
+                        className={`mt-1 rounded px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider ${
+                          hour.heatRisk === "Extreme"
+                            ? "bg-rose-500/40 text-rose-100"
+                            : hour.heatRisk === "High"
+                            ? "bg-amber-500/40 text-amber-100"
+                            : "bg-emerald-500/30 text-emerald-100"
+                        }`}
+                      >
+                        {hour.heatRisk}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -295,7 +307,7 @@ function WeatherPage() {
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Environmental telemetry recorded via SRM Kattankulathur Campus Weather Sensor Hub. Calibrated for student campus wellness.
+        Environmental telemetry recorded via Open-Meteo for {campusLabel} ({userLocation.lat.toFixed(4)}° N, {userLocation.lon.toFixed(4)}° E). Calibrated for student campus wellness.
       </p>
     </AppShell>
   );
