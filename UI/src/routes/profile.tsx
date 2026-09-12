@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { supabase } from "@/integrations/supabase/client";
+import { useFirebaseAuth } from "@/lib/firebase-auth";
 import { student } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/profile")({
@@ -26,13 +26,48 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
+  const { user, profileData, logout, updateUserProfileData } = useFirebaseAuth();
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = async () => {
+    await logout();
     navigate({ to: "/auth", replace: true });
   };
+
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaving(true);
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") ?? "").trim();
+    const age = Number(fd.get("age") ?? 19);
+    const city = String(fd.get("city") ?? "").trim();
+    const water = Number(fd.get("water") ?? 2500);
+    const steps = Number(fd.get("steps") ?? 10000);
+    const sleep = Number(fd.get("sleep") ?? 8);
+
+    await updateUserProfileData({
+      fullName: name || student.name,
+      age: age || student.age,
+      city: city || student.city,
+      waterTarget: water || student.targets.water,
+      stepsTarget: steps || student.targets.steps,
+      sleepTarget: sleep || student.targets.sleep,
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const displayName = profileData?.fullName || user?.displayName || student.name;
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase() || student.initials;
 
   return (
     <AppShell title="Profile" eyebrow="Personal settings">
@@ -45,22 +80,19 @@ function ProfilePage() {
 
       <form
         className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setSaved(true);
-        }}
+        onSubmit={handleSave}
       >
         <ScrollReveal direction="up" delayMs={60} distance={16}>
           <Interactive3DCard maxTilt={1.8} className="rounded-2xl">
             <section className="card-3d preserve-3d p-6 md:p-8 rounded-2xl border border-border/80">
               <div className="flex items-center gap-4">
                 <span className="relative grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 font-display text-xl font-bold text-white shadow-3d-card">
-                  {student.initials}
+                  {initials}
                   <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-emerald-400 border-2 border-card" />
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-display text-2xl font-bold tracking-tight">Profile Information</h2>
+                    <h2 className="font-display text-2xl font-bold tracking-tight">{displayName}</h2>
                     <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary border border-primary/20">
                       Active Student
                     </span>
@@ -72,15 +104,37 @@ function ProfilePage() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Full name</Label>
-                  <Input id="name" defaultValue="Rxnmenn" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input
+                    id="name"
+                    name="name"
+                    defaultValue={profileData?.fullName || user?.displayName || student.name}
+                    maxLength={100}
+                    required
+                    className="h-11 rounded-xl bg-card shadow-xs"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="age" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Age</Label>
-                  <Input id="age" type="number" defaultValue="19" min="13" max="100" className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input
+                    id="age"
+                    name="age"
+                    type="number"
+                    defaultValue={profileData?.age || student.age}
+                    min="13"
+                    max="100"
+                    className="h-11 rounded-xl bg-card shadow-xs"
+                  />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="city" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Campus / City</Label>
-                  <Input id="city" defaultValue="SRM Kattankulathur" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input
+                    id="city"
+                    name="city"
+                    defaultValue={profileData?.city || student.city}
+                    maxLength={100}
+                    required
+                    className="h-11 rounded-xl bg-card shadow-xs"
+                  />
                 </div>
               </div>
 
@@ -90,28 +144,46 @@ function ProfilePage() {
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="water" className="text-xs text-muted-foreground">Water (ml)</Label>
-                    <Input id="water" type="number" defaultValue="2500" className="h-10 rounded-xl bg-card" />
+                    <Input
+                      id="water"
+                      name="water"
+                      type="number"
+                      defaultValue={profileData?.waterTarget || student.targets.water}
+                      className="h-10 rounded-xl bg-card"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="steps" className="text-xs text-muted-foreground">Steps Target</Label>
-                    <Input id="steps" type="number" defaultValue="10000" className="h-10 rounded-xl bg-card" />
+                    <Input
+                      id="steps"
+                      name="steps"
+                      type="number"
+                      defaultValue={profileData?.stepsTarget || student.targets.steps}
+                      className="h-10 rounded-xl bg-card"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="sleep" className="text-xs text-muted-foreground">Sleep Goal (hrs)</Label>
-                    <Input id="sleep" type="number" defaultValue="8" className="h-10 rounded-xl bg-card" />
+                    <Input
+                      id="sleep"
+                      name="sleep"
+                      type="number"
+                      defaultValue={profileData?.sleepTarget || student.targets.sleep}
+                      className="h-10 rounded-xl bg-card"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="mt-8 flex items-center gap-3">
-                <Button className="tactile-btn gap-2" type="submit">
+                <Button className="tactile-btn gap-2" type="submit" disabled={saving}>
                   <Save className="size-4" />
-                  Save Preferences
+                  {saving ? "Saving to Firebase…" : "Save Preferences"}
                 </Button>
                 {saved && (
                   <span className="text-sm font-semibold text-success animate-in fade-in duration-300 flex items-center gap-1.5">
                     <span className="size-2 rounded-full bg-success animate-ping" />
-                    Preferences synchronized
+                    Synchronized with Firebase
                   </span>
                 )}
               </div>
@@ -152,15 +224,21 @@ function ProfilePage() {
 
           <ScrollReveal delayMs={260} direction="up" distance={14}>
             <section className="card-3d p-6 rounded-2xl border border-border/80">
-              <h3 className="font-display text-lg font-bold tracking-tight">Account & Session</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Signed in as <span className="font-semibold text-foreground">rxnmenn@srmist.edu.in</span>. Multi-device sync active.
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold tracking-tight">Account & Session</h3>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-500 border border-emerald-500/20">
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Firebase Cloud
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                Signed in as <span className="font-semibold text-foreground">{user?.email || "rxnmenn@srmist.edu.in"}</span>. Connected to <span className="font-mono text-[11px] text-primary">syncare-f7ec3</span>.
               </p>
               <div className="mt-5 flex gap-2.5">
                 <Button asChild variant="outline" className="tactile-btn flex-1">
                   <Link to="/auth">Switch Account</Link>
                 </Button>
-                <Button type="button" variant="ghost" className="tactile-btn text-coral hover:bg-coral-soft hover:text-coral" onClick={logout}>
+                <Button type="button" variant="ghost" className="tactile-btn text-coral hover:bg-coral-soft hover:text-coral" onClick={handleLogout}>
                   <LogOut className="size-4" />
                   Sign Out
                 </Button>

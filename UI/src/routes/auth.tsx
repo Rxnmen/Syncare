@@ -5,11 +5,12 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
+
+import { useFirebaseAuth } from "@/lib/firebase-auth";
+import { FirebaseError } from "firebase/app";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -27,6 +28,30 @@ export const Route = createFileRoute("/auth")({
 
 const emailSchema = z.string().trim().email("Enter a valid email address").max(255);
 
+function formatFirebaseError(err: unknown): string {
+  if (err instanceof FirebaseError) {
+    switch (err.code) {
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":
+        return "Invalid email or password. Please verify your credentials.";
+      case "auth/email-already-in-use":
+        return "An account with this email already exists. Please sign in.";
+      case "auth/weak-password":
+        return "Password is too weak. Please use at least 8 characters.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/popup-closed-by-user":
+        return "Google sign-in popup was closed before completion.";
+      case "auth/too-many-requests":
+        return "Too many unsuccessful attempts. Please wait a few minutes.";
+      default:
+        return err.message.replace(/^Firebase:\s*/, "");
+    }
+  }
+  return err instanceof Error ? err.message : "An unexpected error occurred.";
+}
+
 function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [show, setShow] = useState(false);
@@ -34,6 +59,7 @@ function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordReset } = useFirebaseAuth();
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,52 +72,57 @@ function AuthPage() {
       return;
     }
     setLoading(true);
-    if (mode === "forgot") {
-      const { error: authError } = await supabase.auth.resetPasswordForEmail(emailResult.data, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      setLoading(false);
-      if (authError) setError(authError.message);
-      else setMessage("Check your email for a secure reset link.");
-      return;
-    }
-    const password = String(fd.get("password") ?? "");
-    if (password.length < 8) {
-      setLoading(false);
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    if (mode === "signup") {
-      const fullName = String(fd.get("fullName") ?? "").trim();
-      const age = Number(fd.get("age"));
-      const city = String(fd.get("city") ?? "").trim();
-      if (!fullName || fullName.length > 100 || !city || city.length > 100 || age < 13 || age > 100) {
+
+    try {
+      if (mode === "forgot") {
+        await sendPasswordReset(emailResult.data);
         setLoading(false);
-        setError("Please check your profile details.");
+        setMessage("Firebase password reset link sent! Check your inbox.");
         return;
       }
-      const { data, error: authError } = await supabase.auth.signUp({
-        email: emailResult.data,
-        password,
-        options: { emailRedirectTo: window.location.origin, data: { full_name: fullName, age, city } },
-      });
+
+      const password = String(fd.get("password") ?? "");
+      if (password.length < 8) {
+        setLoading(false);
+        setError("Password must be at least 8 characters.");
+        return;
+      }
+
+      if (mode === "signup") {
+        const fullName = String(fd.get("fullName") ?? "").trim();
+        const age = Number(fd.get("age"));
+        const city = String(fd.get("city") ?? "").trim();
+        if (!fullName || fullName.length > 100 || !city || city.length > 100 || age < 13 || age > 100) {
+          setLoading(false);
+          setError("Please check your profile details (age between 13-100).");
+          return;
+        }
+
+        await signUpWithEmail(emailResult.data, password, { fullName, age, city });
+        setLoading(false);
+        setMessage("Account created successfully with Firebase!");
+        navigate({ to: "/" });
+        return;
+      }
+
+      // Default: Sign in
+      await signInWithEmail(emailResult.data, password);
       setLoading(false);
-      if (authError) setError(authError.message);
-      else if (!data.session) setMessage("Check your email to confirm your account.");
-      else navigate({ to: "/" });
-      return;
+      navigate({ to: "/" });
+    } catch (err) {
+      setLoading(false);
+      setError(formatFirebaseError(err));
     }
-    const { error: authError } = await supabase.auth.signInWithPassword({ email: emailResult.data, password });
-    setLoading(false);
-    if (authError) setError(authError.message);
-    else navigate({ to: "/" });
   };
 
   const google = async () => {
     setError("");
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) setError(result.error.message);
-    else if (!result.redirected) navigate({ to: "/" });
+    try {
+      await signInWithGoogle();
+      navigate({ to: "/" });
+    } catch (err) {
+      setError(formatFirebaseError(err));
+    }
   };
 
   return (
@@ -188,8 +219,14 @@ function AuthPage() {
                 or continue with
                 <span className="h-px flex-1 bg-border" />
               </div>
-              <Button variant="outline" className="tactile-btn h-11 w-full gap-2" onClick={google}>
-                <span className="font-bold">G</span>Google
+              <Button variant="outline" type="button" className="tactile-btn h-11 w-full gap-2.5 font-medium" onClick={google}>
+                <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                Continue with Google
               </Button>
             </>
           )}
