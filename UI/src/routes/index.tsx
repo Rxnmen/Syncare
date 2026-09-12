@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { RadialGauge } from "@/components/ui/radial-gauge";
-import { metrics, student } from "@/lib/mock-data";
+import { useWellnessStore } from "@/lib/wellness-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,11 +28,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [logged, setLogged] = useState<string | null>(null);
+  const { userName, wellnessScore, metrics, parseAndLog, isSyncing } = useWellnessStore();
+  const [logFeedback, setLogFeedback] = useState<{ [key: string]: { message: string; success: boolean } }>({});
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [inputValues, setInputValues] = useState<{ [key: string]: string }>({});
+
   const date = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
   return (
-    <AppShell title={`Good morning, ${student.name}`} eyebrow={date}>
+    <AppShell title={`Good morning, ${userName}`} eyebrow={date}>
       <ScrollReveal direction="up" distance={16}>
         <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
           <Interactive3DCard maxTilt={2.5} className="rounded-2xl">
@@ -58,7 +62,7 @@ function Index() {
                 <div className="relative flex shrink-0 items-center justify-center">
                   <div className="relative rounded-full bg-white/5 p-2 backdrop-blur-sm border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
                     <RadialGauge
-                      value={78}
+                      value={wellnessScore}
                       size={152}
                       strokeWidth={11}
                       inverted={true}
@@ -111,8 +115,8 @@ function Index() {
             <p className="mt-1 text-sm text-muted-foreground">Six essential signals tracked in real-time.</p>
           </div>
           <span className="hidden items-center gap-1.5 text-xs font-semibold text-success sm:inline-flex bg-success/10 px-2.5 py-1 rounded-full border border-success/20">
-            <span className="size-1.5 rounded-full bg-success animate-pulse" />
-            Live sync active
+            <span className={`size-1.5 rounded-full ${isSyncing ? "bg-amber-400 animate-ping" : "bg-success animate-pulse"}`} />
+            {isSyncing ? "Cloud Syncing..." : "Live sync active"}
           </span>
         </div>
       </ScrollReveal>
@@ -140,77 +144,95 @@ function Index() {
                 { name: "Log exercise", presets: ["15 min walk", "30 min workout", "45 min run"] },
                 { name: "Set mood", presets: ["Energized", "Calm", "Focused", "Tired"] },
                 { name: "Add meal", presets: ["Balanced Lunch", "Healthy Snack", "Nutritious Dinner"] },
-              ].map((item) => (
-                <Dialog key={item.name}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="tactile-btn shadow-xs hover:border-primary/50 hover:bg-primary-soft">
-                      <Plus className="size-3.5 text-primary" />
-                      {item.name}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="font-display text-xl">{item.name}</DialogTitle>
-                      <DialogDescription>Select a quick preset or enter custom value for today.</DialogDescription>
-                    </DialogHeader>
-                    <form
-                      className="space-y-4 pt-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        setLogged(item.name);
-                      }}
-                    >
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Quick Presets</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {item.presets.map((preset) => {
-                            const inputId = `quick-log-${item.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
-                            return (
+              ].map((item) => {
+                const inputId = `quick-log-${item.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+                const currentVal = inputValues[item.name] ?? "";
+                const feedback = logFeedback[item.name];
+                const isSubmitting = submittingAction === item.name;
+
+                return (
+                  <Dialog key={item.name}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="tactile-btn shadow-xs hover:border-primary/50 hover:bg-primary-soft">
+                        <Plus className="size-3.5 text-primary" />
+                        {item.name}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="font-display text-xl">{item.name}</DialogTitle>
+                        <DialogDescription>Select a quick preset or enter custom value for today.</DialogDescription>
+                      </DialogHeader>
+                      <form
+                        className="space-y-4 pt-2"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!currentVal.trim()) return;
+                          setSubmittingAction(item.name);
+                          const res = await parseAndLog(item.name, currentVal);
+                          setSubmittingAction(null);
+                          setLogFeedback((prev) => ({ ...prev, [item.name]: res }));
+                          if (res.success) {
+                            setInputValues((prev) => ({ ...prev, [item.name]: "" }));
+                            setTimeout(() => {
+                              setLogFeedback((prev) => {
+                                const next = { ...prev };
+                                delete next[item.name];
+                                return next;
+                              });
+                            }, 3500);
+                          }
+                        }}
+                      >
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Quick Presets</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {item.presets.map((preset) => (
                               <button
                                 key={preset}
                                 type="button"
                                 onClick={() => {
-                                  const input = document.getElementById(inputId) as HTMLInputElement;
-                                  if (input) input.value = preset;
+                                  setInputValues((prev) => ({ ...prev, [item.name]: preset }));
                                 }}
                                 className="text-xs px-2.5 py-1 rounded-lg border border-border/80 bg-muted/40 hover:bg-primary-soft hover:border-primary/40 hover:text-primary transition-all duration-150 font-medium"
                               >
                                 {preset}
                               </button>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        {(() => {
-                          const inputId = `quick-log-${item.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
-                          return (
-                            <>
-                              <Label htmlFor={inputId}>Custom value</Label>
-                              <Input
-                                id={inputId}
-                                required
-                                maxLength={100}
-                                placeholder="Enter value"
-                                className="h-10"
-                              />
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <Button type="submit" className="tactile-btn w-full">
-                        <Check className="size-4" />
-                        Save update
-                      </Button>
-                      {logged === item.name && (
-                        <p className="text-center text-sm font-semibold text-success animate-in fade-in duration-300">
-                          Saved to today’s summary.
-                        </p>
-                      )}
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              ))}
+                        <div className="space-y-2">
+                          <Label htmlFor={inputId}>Custom value</Label>
+                          <Input
+                            id={inputId}
+                            required
+                            maxLength={100}
+                            placeholder="Enter value"
+                            value={currentVal}
+                            onChange={(e) => {
+                              setInputValues((prev) => ({ ...prev, [item.name]: e.target.value }));
+                            }}
+                            className="h-10"
+                          />
+                        </div>
+                        <Button type="submit" disabled={isSubmitting} className="tactile-btn w-full">
+                          <Check className="size-4" />
+                          {isSubmitting ? "Saving to Syncare..." : "Save update"}
+                        </Button>
+                        {feedback && (
+                          <p
+                            className={`text-center text-sm font-semibold animate-in fade-in duration-300 ${
+                              feedback.success ? "text-success" : "text-destructive"
+                            }`}
+                          >
+                            {feedback.message}
+                          </p>
+                        )}
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                );
+              })}
             </div>
           </div>
         </section>

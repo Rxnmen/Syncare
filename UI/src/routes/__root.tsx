@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { FirebaseAuthProvider } from "@/lib/firebase-auth";
+import { WellnessProvider } from "@/lib/wellness-store";
 
 function NotFoundComponent() {
   return (
@@ -123,8 +124,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <FirebaseAuthProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <WellnessProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </WellnessProvider>
       </FirebaseAuthProvider>
     </QueryClientProvider>
   );

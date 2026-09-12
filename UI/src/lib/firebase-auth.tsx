@@ -42,9 +42,31 @@ interface FirebaseAuthContextType {
 
 const FirebaseAuthContext = createContext<FirebaseAuthContextType | undefined>(undefined);
 
+const GUEST_PROFILE_KEY = "syncare_profile_data_v1";
+
 export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profileData, setProfileData] = useState<StudentProfileData | null>(null);
+  const [profileData, setProfileData] = useState<StudentProfileData | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(GUEST_PROFILE_KEY);
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (err) {
+        console.warn("Could not read profile from localStorage:", err);
+      }
+    }
+    return {
+      fullName: student.name,
+      age: student.age,
+      city: student.city,
+      waterTarget: student.targets.water,
+      stepsTarget: student.targets.steps,
+      sleepTarget: student.targets.sleep,
+      email: "",
+    };
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,10 +77,14 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
           const userDocRef = doc(db, "users", currentUser.uid);
           const snap = await getDoc(userDocRef);
           if (snap.exists()) {
-            setProfileData(snap.data() as StudentProfileData);
+            const data = snap.data() as StudentProfileData;
+            setProfileData(data);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(data));
+            }
           } else {
-            // Initialize default profile on first sign-in
-            const initialData: StudentProfileData = {
+            // Initialize user doc using current profile or student defaults
+            const currentGuest = profileData || {
               fullName: currentUser.displayName || student.name,
               age: student.age,
               city: student.city,
@@ -66,23 +92,26 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
               stepsTarget: student.targets.steps,
               sleepTarget: student.targets.sleep,
               email: currentUser.email || "",
+            };
+            const initialData: StudentProfileData = {
+              fullName: currentUser.displayName || currentGuest.fullName || student.name,
+              age: currentGuest.age || student.age,
+              city: currentGuest.city || student.city,
+              waterTarget: currentGuest.waterTarget || student.targets.water,
+              stepsTarget: currentGuest.stepsTarget || student.targets.steps,
+              sleepTarget: currentGuest.sleepTarget || student.targets.sleep,
+              email: currentUser.email || "",
               updatedAt: serverTimestamp(),
             };
             await setDoc(userDocRef, initialData);
             setProfileData(initialData);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(initialData));
+            }
           }
         } catch (err) {
           console.warn("Could not fetch user document from Firestore:", err);
-          // Fallback to local student data
-          setProfileData({
-            fullName: currentUser.displayName || student.name,
-            age: student.age,
-            city: student.city,
-            email: currentUser.email || "",
-          });
         }
-      } else {
-        setProfileData(null);
       }
       setLoading(false);
     });
@@ -177,8 +206,6 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateUserProfileData = async (data: Partial<StudentProfileData>) => {
-    if (!user) return;
-
     // Strict whitelist and bounds validation
     const cleanData: Partial<StudentProfileData> = {};
     if (data.fullName !== undefined) cleanData.fullName = sanitizeText(data.fullName, 100);
@@ -188,16 +215,39 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     if (data.stepsTarget !== undefined) cleanData.stepsTarget = clampNumber(data.stepsTarget, 1000, 100000, 10000);
     if (data.sleepTarget !== undefined) cleanData.sleepTarget = clampNumber(data.sleepTarget, 3, 14, 8);
 
-    try {
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
-        ...cleanData,
-        updatedAt: serverTimestamp(),
-      });
-      setProfileData((prev) => (prev ? { ...prev, ...cleanData } : null));
-    } catch (err) {
-      console.warn("Could not update user doc in Firestore:", err);
-      setProfileData((prev) => (prev ? { ...prev, ...cleanData } : null));
+    setProfileData((prev) => {
+      const merged: StudentProfileData = {
+        fullName: cleanData.fullName ?? prev?.fullName ?? student.name,
+        age: cleanData.age ?? prev?.age ?? student.age,
+        city: cleanData.city ?? prev?.city ?? student.city,
+        waterTarget: cleanData.waterTarget ?? prev?.waterTarget ?? student.targets.water,
+        stepsTarget: cleanData.stepsTarget ?? prev?.stepsTarget ?? student.targets.steps,
+        sleepTarget: cleanData.sleepTarget ?? prev?.sleepTarget ?? student.targets.sleep,
+        email: prev?.email ?? "",
+      };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(merged));
+        } catch (err) {
+          console.warn("Could not save profile to localStorage:", err);
+        }
+      }
+      return merged;
+    });
+
+    if (user) {
+      try {
+        if (cleanData.fullName && cleanData.fullName !== user.displayName) {
+          await updateProfile(user, { displayName: cleanData.fullName }).catch(() => {});
+        }
+        const userDocRef = doc(db, "users", user.uid);
+        await updateDoc(userDocRef, {
+          ...cleanData,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn("Could not update user doc in Firestore:", err);
+      }
     }
   };
 

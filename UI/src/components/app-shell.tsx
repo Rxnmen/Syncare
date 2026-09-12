@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Bell, CalendarDays, CloudSun, HeartPulse, Home, LineChart, Moon, Quote, Settings, Sparkles, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { student } from "@/lib/mock-data";
+import { useWellnessStore } from "@/lib/wellness-store";
 import { useTheme } from "@/lib/theme";
 
 const items = [
@@ -17,6 +17,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
   const [scrolled, setScrolled] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
   const { isDark, toggleTheme } = useTheme();
+  const { userInitials, isSyncing } = useWellnessStore();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -144,7 +145,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                 aria-label="Open profile"
                 className="grid size-10 place-items-center rounded-xl bg-secondary font-display text-sm font-bold text-secondary-foreground shadow-xs transition-all duration-150 hover:scale-105 active:scale-95"
               >
-                {student.initials}
+                {userInitials}
               </Link>
             </div>
           </div>

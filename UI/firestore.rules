@@ -15,7 +15,7 @@ service cloud.firestore {
       allow create, update: if request.auth != null && request.auth.uid == userId
         // Strict whitelist of allowed fields
         && request.resource.data.keys().hasOnly([
-          'fullName', 'age', 'city', 'waterTarget', 'stepsTarget', 'sleepTarget', 'email', 'updatedAt'
+          'fullName', 'age', 'city', 'waterTarget', 'stepsTarget', 'sleepTarget', 'email', 'completedMilestones', 'updatedAt'
         ])
         // Field validations
         && (!('fullName' in request.resource.data) || (
@@ -51,6 +51,59 @@ service cloud.firestore {
         && (!('email' in request.resource.data) || (
           request.resource.data.email is string &&
           request.resource.data.email.size() <= 255
+        ))
+        && (!('completedMilestones' in request.resource.data) || (
+          request.resource.data.completedMilestones is map
+        ));
+    }
+
+    // Secure daily logs subcollection
+    match /users/{userId}/daily_logs/{dateKey} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly([
+          'date', 'water', 'steps', 'sleep', 'exercise', 'stress', 'study', 'mood', 'meals', 'updatedAt'
+        ])
+        && (!('date' in request.resource.data) || request.resource.data.date == dateKey)
+        && (!('water' in request.resource.data) || (
+          request.resource.data.water is number &&
+          request.resource.data.water >= 0 &&
+          request.resource.data.water <= 15000
+        ))
+        && (!('steps' in request.resource.data) || (
+          request.resource.data.steps is number &&
+          request.resource.data.steps >= 0 &&
+          request.resource.data.steps <= 150000
+        ))
+        && (!('sleep' in request.resource.data) || (
+          request.resource.data.sleep is number &&
+          request.resource.data.sleep >= 0 &&
+          request.resource.data.sleep <= 24
+        ))
+        && (!('exercise' in request.resource.data) || (
+          request.resource.data.exercise is number &&
+          request.resource.data.exercise >= 0 &&
+          request.resource.data.exercise <= 720
+        ))
+        && (!('study' in request.resource.data) || (
+          request.resource.data.study is number &&
+          request.resource.data.study >= 0 &&
+          request.resource.data.study <= 24
+        ))
+        && (!('stress' in request.resource.data) || (
+          request.resource.data.stress in ['Low', 'Moderate', 'High']
+        ))
+        && (!('mood' in request.resource.data) || (
+          request.resource.data.mood is string &&
+          request.resource.data.mood.size() <= 50
+        ))
+        && (!('meals' in request.resource.data) || (
+          request.resource.data.meals is list &&
+          request.resource.data.meals.size() <= 20
         ));
     }
   }

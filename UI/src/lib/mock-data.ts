@@ -18,7 +18,19 @@ export type Metric = {
   icon: LucideIcon;
 };
 
-export const student = { name: "Rxnmenn", city: "SRM Kattankulathur", age: 19, initials: "RN" };
+export const student = {
+  name: "Rxnmenn",
+  city: "SRM Kattankulathur",
+  age: 19,
+  initials: "RN",
+  targets: {
+    water: 2500,
+    steps: 10000,
+    sleep: 8,
+    exercise: 60,
+    study: 4,
+  },
+};
 
 export const metrics: Metric[] = [
   { label: "Water", value: "1.8 L", target: "2.5 L goal", progress: 72, trend: "+0.3 L today", tone: "blue", icon: Droplets },

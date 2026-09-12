@@ -12,12 +12,12 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell, PageHeading } from "@/components/app-shell";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { weeklyData } from "@/lib/mock-data";
+import { useWellnessStore } from "@/lib/wellness-store";
 
 export const Route = createFileRoute("/weekly")({
   head: () => ({
@@ -34,12 +34,22 @@ export const Route = createFileRoute("/weekly")({
 });
 
 function WeeklyPage() {
+  const { weeklyTelemetry, targets, completedMilestones, toggleMilestone } = useWellnessStore();
   const [activeChartMetric, setActiveChartMetric] = useState<"score-sleep" | "stress-exercise">("score-sleep");
-  const [completedGoals, setCompletedGoals] = useState<Record<number, boolean>>({ 1: true });
 
-  const toggleGoal = (id: number) => {
-    setCompletedGoals((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const kpis = useMemo(() => {
+    const n = weeklyTelemetry.length || 1;
+    const avgScore = Math.round(weeklyTelemetry.reduce((acc, d) => acc + d.score, 0) / n);
+    const avgSleepDec = weeklyTelemetry.reduce((acc, d) => acc + d.sleep, 0) / n;
+    const avgSleepHrs = Math.floor(avgSleepDec);
+    const avgSleepMins = Math.round((avgSleepDec - avgSleepHrs) * 60);
+    const avgSleepStr = `${avgSleepHrs}h ${avgSleepMins < 10 ? `0${avgSleepMins}` : avgSleepMins}m`;
+
+    const avgWater = (weeklyTelemetry.reduce((acc, d) => acc + d.water, 0) / n).toFixed(1);
+    const avgSteps = Math.round(weeklyTelemetry.reduce((acc, d) => acc + d.steps, 0) / n).toLocaleString();
+
+    return { avgScore, avgSleepStr, avgWater, avgSteps };
+  }, [weeklyTelemetry]);
 
   return (
     <AppShell title="Weekly Telemetry & Report" eyebrow="8 – 14 September · Campus Cycle">
@@ -62,7 +72,7 @@ function WeeklyPage() {
           {
             icon: Target,
             label: "Average Score",
-            value: "78",
+            value: String(kpis.avgScore),
             unit: "/ 100",
             note: "+4 pts vs last wk",
             isPositive: true,
@@ -71,7 +81,7 @@ function WeeklyPage() {
           {
             icon: BedDouble,
             label: "Average Sleep",
-            value: "7h 09m",
+            value: kpis.avgSleepStr,
             unit: "daily",
             note: "18m less than target",
             isPositive: false,
@@ -80,8 +90,8 @@ function WeeklyPage() {
           {
             icon: Droplets,
             label: "Daily Hydration",
-            value: "2.1 L",
-            unit: "/ 2.5 L",
+            value: `${kpis.avgWater} L`,
+            unit: `/ ${(targets.water / 1000).toFixed(1)} L`,
             note: "+0.2 L improvement",
             isPositive: true,
             iconBg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
@@ -89,7 +99,7 @@ function WeeklyPage() {
           {
             icon: Footprints,
             label: "Average Daily Steps",
-            value: "8,034",
+            value: kpis.avgSteps,
             unit: "steps",
             note: "+11% activity spike",
             isPositive: true,
@@ -165,7 +175,7 @@ function WeeklyPage() {
 
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={weeklyTelemetry} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
@@ -267,7 +277,7 @@ function WeeklyPage() {
 
               <div className="mt-6 h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart data={weeklyTelemetry} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#10b981" />
@@ -360,11 +370,11 @@ function WeeklyPage() {
                     { id: 2, text: "Refill 750ml flask before each 2:00 PM lecture block." },
                     { id: 3, text: "Keep two lighter recovery days between high-intensity training sessions." },
                   ].map((goal) => {
-                    const isDone = Boolean(completedGoals[goal.id]);
+                    const isDone = Boolean(completedMilestones[goal.id]);
                     return (
                       <div
                         key={goal.id}
-                        onClick={() => toggleGoal(goal.id)}
+                        onClick={() => toggleMilestone(goal.id)}
                         className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
                           isDone
                             ? "bg-emerald-500/10 border-emerald-500/30 text-foreground"
