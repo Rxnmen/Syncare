@@ -163,24 +163,40 @@ function Index() {
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">Quick Presets</Label>
                         <div className="flex flex-wrap gap-2">
-                          {item.presets.map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              onClick={() => {
-                                const input = document.getElementById(item.name) as HTMLInputElement;
-                                if (input) input.value = preset;
-                              }}
-                              className="text-xs px-2.5 py-1 rounded-lg border border-border/80 bg-muted/40 hover:bg-primary-soft hover:border-primary/40 hover:text-primary transition-all duration-150 font-medium"
-                            >
-                              {preset}
-                            </button>
-                          ))}
+                          {item.presets.map((preset) => {
+                            const inputId = `quick-log-${item.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+                            return (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(inputId) as HTMLInputElement;
+                                  if (input) input.value = preset;
+                                }}
+                                className="text-xs px-2.5 py-1 rounded-lg border border-border/80 bg-muted/40 hover:bg-primary-soft hover:border-primary/40 hover:text-primary transition-all duration-150 font-medium"
+                              >
+                                {preset}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor={item.name}>Custom value</Label>
-                        <Input id={item.name} required placeholder="Enter value" className="h-10" />
+                        {(() => {
+                          const inputId = `quick-log-${item.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+                          return (
+                            <>
+                              <Label htmlFor={inputId}>Custom value</Label>
+                              <Input
+                                id={inputId}
+                                required
+                                maxLength={100}
+                                placeholder="Enter value"
+                                className="h-10"
+                              />
+                            </>
+                          );
+                        })()}
                       </div>
                       <Button type="submit" className="tactile-btn w-full">
                         <Check className="size-4" />

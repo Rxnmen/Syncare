@@ -83,6 +83,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "author", content: "Syncare" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
+      { httpEquiv: "X-Content-Type-Options", content: "nosniff" },
     ],
     links: [
       {

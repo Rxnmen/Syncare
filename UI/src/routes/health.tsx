@@ -84,7 +84,8 @@ function HealthPage() {
                 <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => setSearchTerm(e.target.value.slice(0, 100))}
+                  maxLength={100}
                   className="h-11 rounded-xl bg-card pl-11 shadow-3d-card transition-shadow focus:shadow-3d-elevated"
                   placeholder="Search hospitals, clinics, 24/7 pharmacies..."
                   aria-label="Search healthcare facilities"
@@ -435,7 +436,8 @@ function HealthPage() {
                         `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                           directionsTarget.name + " " + directionsTarget.address
                         )}`,
-                        "_blank"
+                        "_blank",
+                        "noopener,noreferrer"
                       );
                     }}
                   >

@@ -82,23 +82,24 @@ function AuthPage() {
       }
 
       const password = String(fd.get("password") ?? "");
-      if (password.length < 8) {
+      if (password.length < 8 || password.length > 128) {
         setLoading(false);
-        setError("Password must be at least 8 characters.");
+        setError("Password must be between 8 and 128 characters.");
         return;
       }
 
       if (mode === "signup") {
-        const fullName = String(fd.get("fullName") ?? "").trim();
+        const rawName = String(fd.get("fullName") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
+        const rawCity = String(fd.get("city") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
         const age = Number(fd.get("age"));
-        const city = String(fd.get("city") ?? "").trim();
-        if (!fullName || fullName.length > 100 || !city || city.length > 100 || age < 13 || age > 100) {
+
+        if (!rawName || rawName.length > 100 || !rawCity || rawCity.length > 100 || isNaN(age) || age < 13 || age > 100) {
           setLoading(false);
-          setError("Please check your profile details (age between 13-100).");
+          setError("Please check your profile details (valid name, city up to 100 chars, age between 13-100).");
           return;
         }
 
-        await signUpWithEmail(emailResult.data, password, { fullName, age, city });
+        await signUpWithEmail(emailResult.data, password, { fullName: rawName, age, city: rawCity });
         setLoading(false);
         setMessage("Account created successfully with Firebase!");
         navigate({ to: "/" });
@@ -192,6 +193,7 @@ function AuthPage() {
                     type={show ? "text" : "password"}
                     autoComplete={mode === "signin" ? "current-password" : "new-password"}
                     minLength={8}
+                    maxLength={128}
                     required
                     className="h-10"
                   />

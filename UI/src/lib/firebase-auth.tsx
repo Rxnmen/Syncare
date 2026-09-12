@@ -94,22 +94,38 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
+  const sanitizeText = (text: string, maxLen = 100): string => {
+    return text
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .trim()
+      .slice(0, maxLen);
+  };
+
+  const clampNumber = (num: number, min: number, max: number, defaultVal: number): number => {
+    if (typeof num !== "number" || isNaN(num)) return defaultVal;
+    return Math.min(Math.max(Math.round(num), min), max);
+  };
+
   const signUpWithEmail = async (
     email: string,
     password: string,
     profile: { fullName: string; age: number; city: string }
   ) => {
+    const cleanName = sanitizeText(profile.fullName, 100);
+    const cleanCity = sanitizeText(profile.city, 100);
+    const cleanAge = clampNumber(profile.age, 13, 100, 19);
+
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     if (cred.user) {
-      if (profile.fullName) {
-        await updateProfile(cred.user, { displayName: profile.fullName });
+      if (cleanName) {
+        await updateProfile(cred.user, { displayName: cleanName });
       }
       try {
         const userDocRef = doc(db, "users", cred.user.uid);
         const data: StudentProfileData = {
-          fullName: profile.fullName,
-          age: profile.age,
-          city: profile.city,
+          fullName: cleanName || student.name,
+          age: cleanAge,
+          city: cleanCity || student.city,
           waterTarget: student.targets.water,
           stepsTarget: student.targets.steps,
           sleepTarget: student.targets.sleep,
@@ -132,7 +148,7 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
         const snap = await getDoc(userDocRef);
         if (!snap.exists()) {
           const initialData: StudentProfileData = {
-            fullName: result.user.displayName || student.name,
+            fullName: sanitizeText(result.user.displayName || student.name, 100),
             age: student.age,
             city: student.city,
             waterTarget: student.targets.water,
@@ -162,16 +178,26 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserProfileData = async (data: Partial<StudentProfileData>) => {
     if (!user) return;
+
+    // Strict whitelist and bounds validation
+    const cleanData: Partial<StudentProfileData> = {};
+    if (data.fullName !== undefined) cleanData.fullName = sanitizeText(data.fullName, 100);
+    if (data.city !== undefined) cleanData.city = sanitizeText(data.city, 100);
+    if (data.age !== undefined) cleanData.age = clampNumber(data.age, 13, 100, 19);
+    if (data.waterTarget !== undefined) cleanData.waterTarget = clampNumber(data.waterTarget, 500, 10000, 2500);
+    if (data.stepsTarget !== undefined) cleanData.stepsTarget = clampNumber(data.stepsTarget, 1000, 100000, 10000);
+    if (data.sleepTarget !== undefined) cleanData.sleepTarget = clampNumber(data.sleepTarget, 3, 14, 8);
+
     try {
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
-        ...data,
+        ...cleanData,
         updatedAt: serverTimestamp(),
       });
-      setProfileData((prev) => (prev ? { ...prev, ...data } : null));
+      setProfileData((prev) => (prev ? { ...prev, ...cleanData } : null));
     } catch (err) {
       console.warn("Could not update user doc in Firestore:", err);
-      setProfileData((prev) => (prev ? { ...prev, ...data } : null));
+      setProfileData((prev) => (prev ? { ...prev, ...cleanData } : null));
     }
   };
 

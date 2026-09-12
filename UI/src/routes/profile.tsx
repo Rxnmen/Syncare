@@ -16,6 +16,7 @@ export const Route = createFileRoute("/profile")({
     meta: [
       { title: "Profile & Settings — Syncare" },
       { name: "description", content: "Manage your Syncare profile, goals, notifications, and privacy." },
+      { name: "robots", content: "noindex, nofollow" },
       { property: "og:title", content: "Profile & Settings — Syncare" },
       { property: "og:description", content: "Manage your Syncare profile, goals, notifications, and privacy." },
       { property: "og:type", content: "website" },
@@ -40,20 +41,20 @@ function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     const fd = new FormData(e.currentTarget);
-    const name = String(fd.get("name") ?? "").trim();
-    const age = Number(fd.get("age") ?? 19);
-    const city = String(fd.get("city") ?? "").trim();
-    const water = Number(fd.get("water") ?? 2500);
-    const steps = Number(fd.get("steps") ?? 10000);
-    const sleep = Number(fd.get("sleep") ?? 8);
+    const name = String(fd.get("name") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim().slice(0, 100);
+    const city = String(fd.get("city") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim().slice(0, 100);
+    const age = Math.min(Math.max(Number(fd.get("age")) || 19, 13), 100);
+    const water = Math.min(Math.max(Number(fd.get("water")) || 2500, 500), 10000);
+    const steps = Math.min(Math.max(Number(fd.get("steps")) || 10000, 1000), 100000);
+    const sleep = Math.min(Math.max(Number(fd.get("sleep")) || 8, 3), 14);
 
     await updateUserProfileData({
       fullName: name || student.name,
-      age: age || student.age,
+      age,
       city: city || student.city,
-      waterTarget: water || student.targets.water,
-      stepsTarget: steps || student.targets.steps,
-      sleepTarget: sleep || student.targets.sleep,
+      waterTarget: water,
+      stepsTarget: steps,
+      sleepTarget: sleep,
     });
     setSaving(false);
     setSaved(true);
@@ -148,6 +149,8 @@ function ProfilePage() {
                       id="water"
                       name="water"
                       type="number"
+                      min={500}
+                      max={10000}
                       defaultValue={profileData?.waterTarget || student.targets.water}
                       className="h-10 rounded-xl bg-card"
                     />
@@ -158,6 +161,8 @@ function ProfilePage() {
                       id="steps"
                       name="steps"
                       type="number"
+                      min={1000}
+                      max={100000}
                       defaultValue={profileData?.stepsTarget || student.targets.steps}
                       className="h-10 rounded-xl bg-card"
                     />
@@ -168,6 +173,8 @@ function ProfilePage() {
                       id="sleep"
                       name="sleep"
                       type="number"
+                      min={3}
+                      max={14}
                       defaultValue={profileData?.sleepTarget || student.targets.sleep}
                       className="h-10 rounded-xl bg-card"
                     />

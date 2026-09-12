@@ -11,6 +11,7 @@ export const Route = createFileRoute("/reset-password")({
     meta: [
       { title: "Reset password — Syncare" },
       { name: "description", content: "Set a new secure Syncare password." },
+      { name: "robots", content: "noindex, nofollow" },
       { property: "og:title", content: "Reset password — Syncare" },
       { property: "og:description", content: "Set a new secure Syncare password." },
       { property: "og:type", content: "website" },
@@ -34,11 +35,12 @@ function ResetPassword() {
     // Check search params or hash for Firebase action code
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, "?"));
-    const code = urlParams.get("oobCode") || hashParams.get("oobCode");
+    const rawCode = urlParams.get("oobCode") || hashParams.get("oobCode");
 
-    if (code) {
-      setOobCode(code);
-      verifyPasswordResetCode(auth, code)
+    // Strict validation of reset token format
+    if (rawCode && /^[a-zA-Z0-9_-]{10,250}$/.test(rawCode)) {
+      setOobCode(rawCode);
+      verifyPasswordResetCode(auth, rawCode)
         .then((userEmail) => {
           setEmail(userEmail);
           setValid(true);
@@ -48,7 +50,6 @@ function ResetPassword() {
           setValid(false);
         });
     } else {
-      // Allow fallback if testing without oobCode
       setValid(false);
     }
   }, []);
@@ -57,13 +58,13 @@ function ResetPassword() {
     e.preventDefault();
     setError("");
     const password = String(new FormData(e.currentTarget).get("password") ?? "");
-    if (password.length < 8) {
-      setError("Use at least 8 characters.");
+    if (password.length < 8 || password.length > 128) {
+      setError("Password must be between 8 and 128 characters.");
       return;
     }
 
     if (!oobCode) {
-      setError("Reset link code is missing.");
+      setError("Reset link code is invalid or missing.");
       return;
     }
 
@@ -72,7 +73,7 @@ function ResetPassword() {
       await confirmPasswordReset(auth, oobCode, password);
       navigate({ to: "/auth" });
     } catch (err: any) {
-      setError(err?.message || "Failed to reset password.");
+      setError(err?.message ? String(err.message).replace(/^Firebase:\s*/, "") : "Failed to reset password.");
       setSubmitting(false);
     }
   };
@@ -88,7 +89,15 @@ function ResetPassword() {
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">New password</Label>
-              <Input id="new-password" name="password" type="password" minLength={8} required />
+              <Input
+                id="new-password"
+                name="password"
+                type="password"
+                minLength={8}
+                maxLength={128}
+                required
+                autoComplete="new-password"
+              />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button className="w-full tactile-btn" disabled={submitting}>
@@ -98,7 +107,7 @@ function ResetPassword() {
         ) : (
           <div className="mt-6">
             <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-              This reset link is missing or has expired.
+              This reset link is invalid or has expired.
             </p>
             <Button asChild variant="outline" className="mt-4 w-full tactile-btn">
               <Link to="/auth">Request a new link</Link>
