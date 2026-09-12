@@ -1,4 +1,4 @@
-# VitaStudent roadmap
+# Syncare roadmap
 
 - [x] Establish the visual system and shared responsive app shell
 - [x] Add student authentication and profile storage

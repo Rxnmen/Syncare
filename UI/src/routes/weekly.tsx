@@ -22,9 +22,9 @@ import { weeklyData } from "@/lib/mock-data";
 export const Route = createFileRoute("/weekly")({
   head: () => ({
     meta: [
-      { title: "Weekly Report — VitaStudent" },
+      { title: "Weekly Report — Syncare" },
       { name: "description", content: "Review weekly wellness trends, sleep consistency, hydration, and habit analytics." },
-      { property: "og:title", content: "Weekly Report — VitaStudent" },
+      { property: "og:title", content: "Weekly Report — Syncare" },
       { property: "og:description", content: "Review weekly wellness trends, sleep consistency, hydration, and habit analytics." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -388,7 +388,7 @@ function WeeklyPage() {
               </div>
 
               <div className="mt-6 pt-4 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Targets auto-sync with VitaZen schedule</span>
+                <span>Targets auto-sync with Syncare schedule</span>
                 <span className="font-semibold text-primary">All systems active</span>
               </div>
             </section>

@@ -23,10 +23,10 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 export const Route = createFileRoute("/weather")({
   head: () => ({
     meta: [
-      { title: "Weather & Environment — VitaStudent" },
-      { name: "description", content: "Student-friendly environmental precautions for Chennai climate, UV index, and AQI." },
-      { property: "og:title", content: "Weather & Environment — VitaStudent" },
-      { property: "og:description", content: "Student-friendly environmental precautions for Chennai climate, UV index, and AQI." },
+      { title: "Weather & Environment — Syncare" },
+      { name: "description", content: "Student-friendly environmental precautions for SRM Kattankulathur climate, UV index, and AQI." },
+      { property: "og:title", content: "Weather & Environment — Syncare" },
+      { property: "og:description", content: "Student-friendly environmental precautions for SRM Kattankulathur climate, UV index, and AQI." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -88,7 +88,7 @@ function WeatherPage() {
   };
 
   return (
-    <AppShell title="Atmosphere & Climate" eyebrow="Chennai Campus · Live Environmental Telemetry">
+    <AppShell title="Atmosphere & Climate" eyebrow="SRM Kattankulathur Campus · Live Environmental Telemetry">
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
           title="Plan well for the day outside"
@@ -299,7 +299,7 @@ function WeatherPage() {
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Environmental telemetry recorded via Chennai Metro Weather Sensor Hub. Calibrated for student campus wellness.
+        Environmental telemetry recorded via SRM Kattankulathur Campus Weather Sensor Hub. Calibrated for student campus wellness.
       </p>
     </AppShell>
   );

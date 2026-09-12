@@ -14,10 +14,10 @@ import { student } from "@/lib/mock-data";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Profile & Settings — VitaStudent" },
-      { name: "description", content: "Manage your VitaStudent profile, goals, notifications, and privacy." },
-      { property: "og:title", content: "Profile & Settings — VitaStudent" },
-      { property: "og:description", content: "Manage your VitaStudent profile, goals, notifications, and privacy." },
+      { title: "Profile & Settings — Syncare" },
+      { name: "description", content: "Manage your Syncare profile, goals, notifications, and privacy." },
+      { property: "og:title", content: "Profile & Settings — Syncare" },
+      { property: "og:description", content: "Manage your Syncare profile, goals, notifications, and privacy." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -38,7 +38,7 @@ function ProfilePage() {
     <AppShell title="Profile" eyebrow="Personal settings">
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
-          title="Make VitaStudent yours"
+          title="Make Syncare yours"
           description="Keep your profile current and shape goals that work with your real student routine."
         />
       </ScrollReveal>
@@ -72,15 +72,15 @@ function ProfilePage() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Full name</Label>
-                  <Input id="name" defaultValue="Alex Kumar" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input id="name" defaultValue="Rxnmenn" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="age" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Age</Label>
-                  <Input id="age" type="number" defaultValue="20" min="13" max="100" className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input id="age" type="number" defaultValue="19" min="13" max="100" className="h-11 rounded-xl bg-card shadow-xs" />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="city" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Campus / City</Label>
-                  <Input id="city" defaultValue="Chennai Central Campus" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
+                  <Input id="city" defaultValue="SRM Kattankulathur" maxLength={100} required className="h-11 rounded-xl bg-card shadow-xs" />
                 </div>
               </div>
 
@@ -154,7 +154,7 @@ function ProfilePage() {
             <section className="card-3d p-6 rounded-2xl border border-border/80">
               <h3 className="font-display text-lg font-bold tracking-tight">Account & Session</h3>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Signed in as <span className="font-semibold text-foreground">alex@student.college.edu</span>. Multi-device sync active.
+                Signed in as <span className="font-semibold text-foreground">rxnmenn@srmist.edu.in</span>. Multi-device sync active.
               </p>
               <div className="mt-5 flex gap-2.5">
                 <Button asChild variant="outline" className="tactile-btn flex-1">

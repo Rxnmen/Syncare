@@ -53,7 +53,7 @@ export function QuickHealthHelp() {
           <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning-foreground" />
           <p className="leading-relaxed">
             <strong className="block">This is not a diagnosis</strong>
-            <span className="text-muted-foreground">VitaStudent provides general information only and cannot replace advice from a qualified professional.</span>
+            <span className="text-muted-foreground">Syncare provides general information only and cannot replace advice from a qualified professional.</span>
           </p>
         </div>
         <div className="flex gap-3 rounded-xl border border-coral/25 bg-coral-soft p-4 shadow-sm">

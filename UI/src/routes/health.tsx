@@ -27,9 +27,9 @@ import { locations } from "@/lib/mock-data";
 export const Route = createFileRoute("/health")({
   head: () => ({
     meta: [
-      { title: "Nearby Care — VitaStudent" },
+      { title: "Nearby Care — Syncare" },
       { name: "description", content: "Find nearby student healthcare, hospital radar, and vaccination records." },
-      { property: "og:title", content: "Nearby Care — VitaStudent" },
+      { property: "og:title", content: "Nearby Care — Syncare" },
       { property: "og:description", content: "Find nearby student healthcare, hospital radar, and vaccination records." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -58,7 +58,7 @@ function HealthPage() {
   });
 
   return (
-    <AppShell title="Health & Care Radar" eyebrow="Healthcare around Campus · Chennai">
+    <AppShell title="Health & Care Radar" eyebrow="Healthcare around Campus · SRM Kattankulathur">
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
           title="Care, when you need it"
@@ -164,7 +164,7 @@ function HealthPage() {
                   </span>
                 </div>
                 <span className="mt-1 rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-300 border border-emerald-500/30 backdrop-blur-xs">
-                  Campus Gate 1
+                  SRM Arch Gate · Kattankulathur
                 </span>
               </div>
 
@@ -220,7 +220,7 @@ function HealthPage() {
               {/* Architectural HUD Overlay */}
               <div className="absolute top-4 left-4 flex items-center gap-2 rounded-lg bg-slate-900/85 px-3 py-1.5 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-500/20 backdrop-blur-md">
                 <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>RADAR 13.0827° N, 80.2707° E</span>
+                <span>RADAR 12.8230° N, 80.0444° E · SRM KTR</span>
               </div>
 
               <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-lg bg-slate-900/85 px-3 py-1.5 text-[11px] font-mono text-slate-300 border border-slate-700 backdrop-blur-md">

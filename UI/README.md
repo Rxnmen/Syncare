@@ -1,6 +1,6 @@
-# VitaWell Companion
+# Syncare
 
-Build a modern, clean, polished web app for a student wellness and health companion called “VitaStudent” (you can use a better temporary name if needed).
+A modern, clean, polished web app for a student wellness and health companion called “Syncare”.
 
 IMPORTANT: Focus on building the FRONTEND/UI/UX first. Do not build complicated backend logic yet. Use realistic mock/sample data so that every screen looks complete and functional. The code should be structured cleanly so Firebase, Groq API, weather API and OpenStreetMap can be connected later.
 

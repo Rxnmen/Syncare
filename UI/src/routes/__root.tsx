@@ -77,9 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "VitaStudent" },
+      { title: "Syncare" },
       { name: "description", content: "A daily wellness companion for students." },
-      { name: "author", content: "VitaStudent" },
+      { name: "author", content: "Syncare" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

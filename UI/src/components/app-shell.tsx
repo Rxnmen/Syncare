@@ -48,16 +48,16 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
             <Sparkles className="size-5" />
           </span>
           <div>
-            <strong className="block font-display text-lg font-bold tracking-tight">VitaStudent</strong>
-            <span className="text-[11px] font-medium text-muted-foreground">Daily wellbeing suite</span>
+            <strong className="block font-display text-lg font-bold tracking-tight">Syncare</strong>
+            <span className="text-[11px] font-medium text-muted-foreground">Student wellness suite</span>
           </div>
         </Link>
 
         {/* Live Status Pill */}
         <div className="mt-5 flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-xs">
           <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-medium text-foreground">Active Campus Sync</span>
-          <span className="ml-auto text-[10px] text-muted-foreground">Chennai</span>
+          <span className="font-medium text-foreground">SRM Campus Sync</span>
+          <span className="ml-auto text-[10px] text-muted-foreground font-semibold">SRM KTR</span>
         </div>
 
         <nav className="mt-8 space-y-1.5" aria-label="Main navigation">

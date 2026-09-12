@@ -7,7 +7,10 @@ export function useTheme() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const saved = (localStorage.getItem("vitastudent-theme") as Theme) || "system";
+    const saved =
+      (localStorage.getItem("syncare-theme") as Theme) ||
+      (localStorage.getItem("vitastudent-theme") as Theme) ||
+      "system";
     setThemeState(saved);
     applyTheme(saved);
   }, []);
@@ -27,7 +30,7 @@ export function useTheme() {
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem("vitastudent-theme", t);
+    localStorage.setItem("syncare-theme", t);
     applyTheme(t);
   };
 

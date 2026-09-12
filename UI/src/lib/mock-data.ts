@@ -18,7 +18,7 @@ export type Metric = {
   icon: LucideIcon;
 };
 
-export const student = { name: "Alex", city: "Chennai", age: 20, initials: "AK" };
+export const student = { name: "Rxnmenn", city: "SRM Kattankulathur", age: 19, initials: "RN" };
 
 export const metrics: Metric[] = [
   { label: "Water", value: "1.8 L", target: "2.5 L goal", progress: 72, trend: "+0.3 L today", tone: "blue", icon: Droplets },
@@ -40,10 +40,10 @@ export const weeklyData = [
 ];
 
 export const locations = [
-  { name: "Apollo First Med", type: "Clinic", distance: "1.2 km", open: true, address: "TTK Road, Alwarpet", x: "28%", y: "34%" },
-  { name: "Kauvery Hospital", type: "Hospital", distance: "2.4 km", open: true, address: "Luz Church Road, Mylapore", x: "63%", y: "27%" },
-  { name: "MedPlus Pharmacy", type: "Pharmacy", distance: "0.8 km", open: true, address: "CP Ramaswamy Road", x: "46%", y: "62%" },
-  { name: "Urban Health Centre", type: "Vaccination", distance: "3.1 km", open: false, address: "Royapettah High Road", x: "76%", y: "70%" },
+  { name: "SRM General Hospital", type: "Hospital", distance: "0.4 km", open: true, address: "GST Road, SRM Nagar, Kattankulathur", x: "32%", y: "30%" },
+  { name: "SRM Student Health Centre", type: "Clinic", distance: "0.2 km", open: true, address: "University Campus, Near Tech Park", x: "65%", y: "26%" },
+  { name: "Apollo Pharmacy Potheri", type: "Pharmacy", distance: "0.6 km", open: true, address: "Potheri Station Road, Kattankulathur", x: "44%", y: "65%" },
+  { name: "SRM Immunization & Triage", type: "Vaccination", distance: "0.5 km", open: false, address: "Medical College Block, Kattankulathur", x: "78%", y: "68%" },
 ];
 
 export const healthHelp = {

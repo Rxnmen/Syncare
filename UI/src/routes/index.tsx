@@ -16,9 +16,9 @@ import { metrics, student } from "@/lib/mock-data";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "VitaStudent — Daily Wellness Companion" },
+      { title: "Syncare — Daily Wellness Companion" },
       { name: "description", content: "Track daily student wellness, habits, health guidance, and personalised insights." },
-      { property: "og:title", content: "VitaStudent — Daily Wellness Companion" },
+      { property: "og:title", content: "Syncare — Daily Wellness Companion" },
       { property: "og:description", content: "Track daily student wellness, habits, health guidance, and personalised insights." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

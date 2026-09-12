@@ -14,10 +14,10 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — VitaStudent" },
-      { name: "description", content: "Sign in or create your VitaStudent wellness profile." },
-      { property: "og:title", content: "Sign in — VitaStudent" },
-      { property: "og:description", content: "Sign in or create your VitaStudent wellness profile." },
+      { title: "Sign in — Syncare" },
+      { name: "description", content: "Sign in or create your Syncare wellness profile." },
+      { property: "og:title", content: "Sign in — Syncare" },
+      { property: "og:description", content: "Sign in or create your Syncare wellness profile." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -102,7 +102,7 @@ function AuthPage() {
             <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-105">
               <Sparkles className="size-5" />
             </span>
-            <span className="font-display text-xl font-semibold">VitaStudent</span>
+            <span className="font-display text-xl font-bold tracking-tight">Syncare</span>
           </Link>
           <div className="mt-10">
             <p className="text-xs font-semibold uppercase tracking-wider text-primary">
@@ -126,23 +126,23 @@ function AuthPage() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full name</Label>
-                  <Input id="fullName" name="fullName" required maxLength={100} placeholder="Alex Kumar" className="h-10" />
+                  <Input id="fullName" name="fullName" required maxLength={100} placeholder="Rxnmenn" className="h-10" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="age">Age</Label>
-                    <Input id="age" name="age" type="number" min="13" max="100" required placeholder="20" className="h-10" />
+                    <Input id="age" name="age" type="number" min="13" max="100" required placeholder="19" className="h-10" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input id="city" name="city" required maxLength={100} placeholder="Chennai" className="h-10" />
+                    <Label htmlFor="city">Campus / City</Label>
+                    <Input id="city" name="city" required maxLength={100} placeholder="SRM Kattankulathur" className="h-10" />
                   </div>
                 </div>
               </>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required placeholder="alex@college.edu" className="h-10" />
+              <Input id="email" name="email" type="email" autoComplete="email" required placeholder="rxnmenn@srmist.edu.in" className="h-10" />
             </div>
             {mode !== "forgot" && (
               <div className="space-y-2">
@@ -197,7 +197,7 @@ function AuthPage() {
             className="mt-6 w-full text-center text-sm text-muted-foreground hover:text-foreground hover:underline"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
           >
-            {mode === "signin" ? "New to VitaStudent? Create an account" : "Already have an account? Sign in"}
+            {mode === "signin" ? "New to Syncare? Create an account" : "Already have an account? Sign in"}
           </button>
         </ScrollReveal>
       </section>
