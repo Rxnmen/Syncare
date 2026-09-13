@@ -32,9 +32,63 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
-async function loadMapLibre() {
-  const mod = await import("maplibre-gl");
-  return (mod as any).default?.Map ? (mod as any).default : mod;
+async function loadMapLibre(): Promise<any> {
+  if (typeof window === "undefined") return null;
+
+  // 1. Check if window.maplibregl is already populated
+  if (typeof (window as any).maplibregl?.Map === "function") {
+    return (window as any).maplibregl;
+  }
+
+  // 2. Try standard import (works in production build and Vite optimizer)
+  try {
+    const mod = await import("maplibre-gl");
+    if (typeof mod?.Map === "function") return mod;
+    if (typeof (mod as any)?.default?.Map === "function") return (mod as any).default;
+  } catch (e) {
+    console.warn("Module import could not resolve Map constructor, falling back:", e);
+  }
+
+  if (typeof (window as any).maplibregl?.Map === "function") {
+    return (window as any).maplibregl;
+  }
+
+  // 3. Fallback: Load official standalone UMD bundle from unpkg (same CDN OpenFreeMap uses)
+  await new Promise<void>((resolve, reject) => {
+    // Inject CSS
+    if (!document.getElementById("maplibre-core-css")) {
+      const link = document.createElement("link");
+      link.id = "maplibre-core-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css";
+      document.head.appendChild(link);
+    }
+
+    const existing = document.getElementById("maplibre-core-script") as HTMLScriptElement;
+    if (existing) {
+      if (typeof (window as any).maplibregl?.Map === "function") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load maplibre script")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "maplibre-core-script";
+    script.src = "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load maplibre-gl from unpkg"));
+    document.head.appendChild(script);
+  });
+
+  if (typeof (window as any).maplibregl?.Map === "function") {
+    return (window as any).maplibregl;
+  }
+
+  throw new Error("Could not find Map constructor in maplibre-gl");
 }
 
 export function CareMap({
