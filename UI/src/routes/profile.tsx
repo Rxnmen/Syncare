@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { useFirebaseAuth } from "@/lib/firebase-auth";
+import { useWellnessStore } from "@/lib/wellness-store";
 import { student } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/profile")({
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   const { user, profileData, logout, updateUserProfileData } = useFirebaseAuth();
+  const { setUserCity } = useWellnessStore();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
@@ -56,6 +58,9 @@ function ProfilePage() {
       stepsTarget: steps,
       sleepTarget: sleep,
     });
+    if (city) {
+      await setUserCity(city);
+    }
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

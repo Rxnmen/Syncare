@@ -6,8 +6,11 @@ import {
   Compass,
   Droplets,
   Eye,
+  Globe,
   Info,
   Layers,
+  Loader2,
+  MapPin,
   Shirt,
   Sparkles,
   Sun,
@@ -17,6 +20,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { AppShell, PageHeading } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { useWellnessStore } from "@/lib/wellness-store";
@@ -86,6 +91,23 @@ function WeatherPage() {
   const weather = useWeatherTelemetry(userLocation.lat, userLocation.lon);
   const { todayLog, togglePrecaution } = useWellnessStore();
   const completedPrecautions = todayLog.precautions || [];
+  const [locationQuery, setLocationQuery] = useState("");
+
+  const QUICK_LOCATIONS = [
+    { label: "SRM KTR (Campus)", query: "SRM Kattankulathur" },
+    { label: "Tokyo", query: "Tokyo" },
+    { label: "London", query: "London" },
+    { label: "New York", query: "New York" },
+    { label: "Paris", query: "Paris" },
+    { label: "Bangalore", query: "Bangalore" },
+    { label: "Sydney", query: "Sydney" },
+  ];
+
+  const handleLocationChange = async (target: string) => {
+    if (!target.trim()) return;
+    await userLocation.setGlobalLocation(target.trim());
+    setLocationQuery("");
+  };
 
   const WeatherHeroIcon = getWeatherIcon(weather.weatherCode);
   const campusLabel = userLocation.displayName.split(",")[0] || "SRM Kattankulathur";
@@ -103,6 +125,94 @@ function WeatherPage() {
             </div>
           }
         />
+      </ScrollReveal>
+
+      {/* Global Location Switcher HUD */}
+      <ScrollReveal direction="up" delayMs={40} distance={14}>
+        <div className="mb-6 rounded-2xl border border-border/80 bg-card/85 p-4 backdrop-blur-md shadow-3d-card space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <Globe className="size-4 text-emerald-500" />
+              <span>Telemetry Target:</span>
+              <span className="font-bold text-foreground truncate max-w-[220px] sm:max-w-[340px]">
+                {userLocation.displayName}
+              </span>
+              <span className="font-mono text-[11px] text-emerald-500/90 hidden md:inline">
+                ({userLocation.lat.toFixed(4)}°, {userLocation.lon.toFixed(4)}°)
+              </span>
+            </div>
+            {userLocation.isLoading && (
+              <span className="flex items-center gap-1.5 font-mono text-xs text-emerald-400 animate-pulse">
+                <Loader2 className="size-3 animate-spin" /> Fetching coordinates & weather...
+              </span>
+            )}
+          </div>
+
+          {/* Location Input Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLocationChange(locationQuery);
+            }}
+            className="relative flex gap-2"
+          >
+            <div className="relative flex-1">
+              <MapPin className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value.slice(0, 100))}
+                maxLength={100}
+                className="h-10 rounded-xl bg-background/80 pl-10 text-xs shadow-xs"
+                placeholder="Change weather location worldwide (e.g. Tokyo, London, Paris, NYC)..."
+                aria-label="Change weather location worldwide"
+              />
+              {locationQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLocationQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!locationQuery.trim() || userLocation.isLoading}
+              className="tactile-btn rounded-xl px-4 text-xs font-semibold"
+            >
+              Update Weather
+            </Button>
+          </form>
+
+          {/* Quick-switch Worldwide Cities */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap mr-1">
+              Quick switch:
+            </span>
+            {QUICK_LOCATIONS.map((loc) => {
+              const isActive =
+                userLocation.displayName.toLowerCase().includes(loc.query.toLowerCase()) ||
+                (loc.query.includes("SRM") && userLocation.displayName.toLowerCase().includes("srm"));
+              return (
+                <button
+                  key={loc.query}
+                  type="button"
+                  onClick={() => handleLocationChange(loc.query)}
+                  disabled={userLocation.isLoading}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-all border ${
+                    isActive
+                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40 shadow-xs font-semibold"
+                      : "bg-muted/50 text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {loc.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </ScrollReveal>
 
       {/* Atmospheric Glass Hero */}

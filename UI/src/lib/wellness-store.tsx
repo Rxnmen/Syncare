@@ -66,6 +66,7 @@ interface WellnessContextType {
   userName: string;
   userInitials: string;
   userCity: string;
+  setUserCity: (city: string) => Promise<void>;
   logWater: (amountMl: number) => Promise<void>;
   logSteps: (count: number) => Promise<void>;
   logSleep: (hours: number) => Promise<void>;
@@ -173,6 +174,18 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState<FirestoreStatus>("offline");
+
+  const [customCity, setCustomCity] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("syncare_user_city");
+        if (saved) return saved;
+      } catch {
+        // ignore
+      }
+    }
+    return "";
+  });
 
   // Targets derived from active profile or defaults
   const targets: WellnessTargets = useMemo(() => ({
@@ -677,7 +690,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   }, [todayLog, wellnessScore]);
 
   const userName = profileData?.fullName || user?.displayName || student.name;
-  const userCity = profileData?.city || student.city;
+  const userCity = customCity || profileData?.city || student.city || "SRM Kattankulathur";
   const userInitials = userName
     .split(" ")
     .filter(Boolean)
@@ -685,6 +698,34 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     .join("")
     .substring(0, 2)
     .toUpperCase() || student.initials;
+
+  const setUserCity = useCallback(
+    async (newCity: string) => {
+      const clean = newCity.trim().slice(0, 100);
+      if (!clean) return;
+      setCustomCity(clean);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("syncare_user_city", clean);
+        } catch (err) {
+          console.warn("Could not save city to localStorage:", err);
+        }
+      }
+      if (user) {
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          await setDoc(
+            userDocRef,
+            { city: clean, updatedAt: serverTimestamp() },
+            { merge: true }
+          );
+        } catch (err) {
+          console.warn("Could not sync city to Firestore:", err);
+        }
+      }
+    },
+    [user]
+  );
 
   return (
     <WellnessContext.Provider
@@ -701,6 +742,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         userName,
         userInitials,
         userCity,
+        setUserCity,
         logWater,
         logSteps,
         logSleep,
