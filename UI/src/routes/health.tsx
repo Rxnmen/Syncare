@@ -25,9 +25,13 @@ import { Input } from "@/components/ui/input";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { useWellnessStore } from "@/lib/wellness-store";
-import { locations } from "@/lib/mock-data";
 import { CareMap } from "@/components/care-map";
-import { useResolvedLocation } from "@/lib/location-service";
+import {
+  useResolvedLocation,
+  getNearbyFacilities,
+  getEmergencyHotline,
+  type FacilityItem,
+} from "@/lib/location-service";
 
 export const Route = createFileRoute("/health")({
   head: () => ({
@@ -43,7 +47,7 @@ export const Route = createFileRoute("/health")({
   component: HealthPage,
 });
 
-type LocationItem = (typeof locations)[number];
+type LocationItem = FacilityItem;
 
 function HealthPage() {
   const { healthRecords } = useWellnessStore();
@@ -72,7 +76,10 @@ function HealthPage() {
     setLocationQuery("");
   };
 
-  const filteredLocations = locations.filter((loc) => {
+  const activeFacilities = getNearbyFacilities(userLocation.displayName, userLocation.lat, userLocation.lon);
+  const emergencyHotline = getEmergencyHotline(userLocation.displayName);
+
+  const filteredLocations = activeFacilities.filter((loc) => {
     const matchesCategory = activeCategory === "All" || loc.type.toLowerCase().includes(activeCategory.toLowerCase());
     const matchesSearch =
       loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -91,11 +98,11 @@ function HealthPage() {
           description="Live architectural radar of emergency services, campus triage, and student medical records."
           action={
             <a
-              href="tel:112"
+              href={`tel:${emergencyHotline.number}`}
               className="group flex items-center gap-2.5 rounded-full border border-coral/30 bg-coral/10 px-4 py-2 text-sm font-semibold text-coral shadow-xs backdrop-blur-md transition-all hover:bg-coral hover:text-white"
             >
               <Ambulance className="size-4 animate-pulse group-hover:scale-110 transition-transform" />
-              <span>Emergency Hotline: 112</span>
+              <span>{emergencyHotline.label}</span>
             </a>
           }
         />
@@ -372,8 +379,8 @@ function HealthPage() {
                     <Cross className="size-5" />
                   </span>
                   <div>
-                    <h3 className="font-display text-xl font-bold">Campus Triage Desk</h3>
-                    <p className="text-xs text-emerald-200">Building C · First Aid & Referrals</p>
+                    <h3 className="font-display text-xl font-bold">{campusTitle} Triage Desk</h3>
+                    <p className="text-xs text-emerald-200">Local Area · First Aid & Referrals</p>
                   </div>
                 </div>
                 <p className="mt-4 text-sm leading-relaxed text-white/85">
@@ -390,7 +397,7 @@ function HealthPage() {
                   <Button
                     variant="outline"
                     className="border-white/30 text-white hover:bg-white/10"
-                    onClick={() => alert("Campus clinic hours: Mon-Sat 8am-6pm. Walk-ins welcome at Building C, Room 102.")}
+                    onClick={() => alert(`${campusTitle} clinic hours: Mon-Sat 8am-6pm. Walk-ins welcome for student triage.`)}
                   >
                     Schedule
                   </Button>
@@ -429,7 +436,9 @@ function HealthPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Recommended Route</span>
-                    <span className="font-semibold text-foreground">Via Main Boulevard Gate 2</span>
+                    <span className="font-semibold text-foreground">
+                      {directionsTarget.routeHint || "Via Main Access Corridor"}
+                    </span>
                   </div>
                 </div>
 

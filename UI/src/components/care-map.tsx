@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { type locations } from "@/lib/mock-data";
+import { type FacilityItem } from "@/lib/location-service";
 import { Compass, Globe, Loader2 } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-type LocationItem = (typeof locations)[number];
+type LocationItem = FacilityItem;
 
 interface CareMapProps {
   centerLat: number;
@@ -22,6 +22,15 @@ const FACILITY_OFFSETS: Record<string, [number, number]> = {
   "Apollo Pharmacy Potheri": [-0.0032, -0.0049],
   "SRM Immunization & Triage": [-0.0020, 0.0026],
 };
+
+const DEFAULT_OFFSETS: [number, number][] = [
+  [0.0032, -0.0038],
+  [0.0018, 0.0028],
+  [-0.0031, -0.0042],
+  [-0.0022, 0.0035],
+  [0.0041, 0.0022],
+  [-0.0038, 0.0019],
+];
 
 function escapeHtml(str: string): string {
   return str
@@ -237,11 +246,8 @@ export function CareMap({
       markersRef.current.push(hubMarker);
 
       // 2. Monitored Facility Pins
-      facilityList.forEach((place) => {
-        const offset = FACILITY_OFFSETS[place.name] || [
-          (((place.name.charCodeAt(0) * 19) % 50) - 25) * 0.00015,
-          (((place.name.charCodeAt(1) * 29) % 50) - 25) * 0.00015,
-        ];
+      facilityList.forEach((place, idx) => {
+        const offset = FACILITY_OFFSETS[place.name] || DEFAULT_OFFSETS[idx % DEFAULT_OFFSETS.length];
         const markerLat = centerLat + offset[0];
         const markerLon = centerLon + offset[1];
 
