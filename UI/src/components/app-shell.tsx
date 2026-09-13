@@ -1,8 +1,9 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { Bell, CalendarDays, CloudSun, HeartPulse, Home, LineChart, Moon, Quote, Settings, Sparkles, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useWellnessStore } from "@/lib/wellness-store";
 import { useTheme } from "@/lib/theme";
+import { useFirebaseAuth } from "@/lib/firebase-auth";
 
 const items = [
   { to: "/" as const, label: "Home", icon: Home },
@@ -14,10 +15,18 @@ const items = [
 
 export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow: string }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, loading } = useFirebaseAuth();
   const [scrolled, setScrolled] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
   const { isDark, toggleTheme } = useTheme();
   const { userInitials, isSyncing } = useWellnessStore();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate({ to: "/auth", replace: true });
+    }
+  }, [loading, user, navigate]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,6 +43,26 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 animate-pulse">
+            <Sparkles className="size-7" />
+          </div>
+          <div>
+            <h1 className="font-display text-lg font-bold tracking-tight">Syncare</h1>
+            <p className="text-xs text-muted-foreground mt-1">Connecting to your wellness space…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen bg-background text-foreground selection:bg-primary/20 selection:text-primary">

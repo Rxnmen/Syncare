@@ -877,15 +877,15 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     });
   }, [todayKey, todayLog, historicalLogs, targets]);
 
-  const userName = profileData?.fullName || user?.displayName || student.name;
-  const userCity = customCity || profileData?.city || student.city || "SRM Kattankulathur";
-  const userInitials = userName
+  const userName = profileData?.fullName || user?.displayName || (user?.email ? user.email.split("@")[0] : "") || "Student";
+  const userCity = customCity || profileData?.city || "SRM Kattankulathur";
+  const userInitials = (userName || "ST")
     .split(" ")
     .filter(Boolean)
     .map((n) => n[0])
     .join("")
     .substring(0, 2)
-    .toUpperCase() || student.initials;
+    .toUpperCase() || "SC";
 
   const setUserCity = useCallback(
     async (newCity: string) => {

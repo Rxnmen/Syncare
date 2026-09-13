@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Droplets, Loader2, Plus, Ruler, SlidersHorizontal, Sparkles, TrendingUp, UserRound, Weight } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -13,6 +13,7 @@ import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { RadialGauge } from "@/components/ui/radial-gauge";
 import { useWellnessStore, getTimeOfDayGreeting } from "@/lib/wellness-store";
+import { useFirebaseAuth } from "@/lib/firebase-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +30,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user, loading: authLoading } = useFirebaseAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate({ to: "/auth", replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
   const {
     userName,
     wellnessScore,

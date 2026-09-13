@@ -19,13 +19,13 @@ export type Metric = {
 };
 
 export const student = {
-  name: "Rxnmenn",
+  name: "Student",
   city: "SRM Kattankulathur",
   age: 19,
   gender: "Not specified",
   weight: 65,
   height: 170,
-  initials: "RN",
+  initials: "ST",
   targets: {
     water: 2500,
     steps: 10000,

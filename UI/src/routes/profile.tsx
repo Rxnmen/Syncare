@@ -97,14 +97,14 @@ function ProfilePage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const displayName = profileData?.fullName || user?.displayName || student.name;
+  const displayName = profileData?.fullName || user?.displayName || (user?.email ? user.email.split("@")[0] : "") || "Student";
   const initials = displayName
     .split(" ")
     .filter(Boolean)
     .map((n) => n[0])
     .join("")
     .substring(0, 2)
-    .toUpperCase() || student.initials;
+    .toUpperCase() || "ST";
 
   return (
     <AppShell title="Profile" eyebrow="Personal settings">
@@ -366,7 +366,7 @@ function ProfilePage() {
                 </span>
               </div>
               <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Signed in as <span className="font-semibold text-foreground">{user?.email || "rxnmenn@srmist.edu.in"}</span>. Connected to <span className="font-mono text-[11px] text-primary">syncare-f7ec3</span>.
+                Signed in as <span className="font-semibold text-foreground">{user?.email || profileData?.email || "Student"}</span>. Connected to <span className="font-mono text-[11px] text-primary">syncare-f7ec3</span>.
               </p>
               <div className="mt-5 flex gap-2.5">
                 <Button asChild variant="outline" className="tactile-btn flex-1">

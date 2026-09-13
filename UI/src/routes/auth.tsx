@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +64,13 @@ function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordReset } = useFirebaseAuth();
+  const { user, loading: authLoading, signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordReset } = useFirebaseAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate({ to: "/", replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -163,7 +169,7 @@ function AuthPage() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full name</Label>
-                  <Input id="fullName" name="fullName" required maxLength={100} placeholder="Rxnmenn" className="h-10" />
+                  <Input id="fullName" name="fullName" required maxLength={100} placeholder="Your name" className="h-10" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -179,7 +185,7 @@ function AuthPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required placeholder="rxnmenn@srmist.edu.in" className="h-10" />
+              <Input id="email" name="email" type="email" autoComplete="email" required placeholder="student@srmist.edu.in" className="h-10" />
             </div>
             {mode !== "forgot" && (
               <div className="space-y-2">

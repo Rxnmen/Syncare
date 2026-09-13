@@ -60,18 +60,7 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
         console.warn("Could not read profile from localStorage:", err);
       }
     }
-    return {
-      fullName: student.name,
-      age: student.age,
-      city: student.city,
-      gender: (student as any).gender || "Not specified",
-      weight: (student as any).weight || 65,
-      height: (student as any).height || 170,
-      waterTarget: student.targets.water,
-      stepsTarget: student.targets.steps,
-      sleepTarget: student.targets.sleep,
-      email: "",
-    };
+    return null;
   });
   const [loading, setLoading] = useState(true);
 
@@ -89,29 +78,18 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(data));
             }
           } else {
-            // Initialize user doc using current profile or student defaults
-            const currentGuest = profileData || {
-              fullName: currentUser.displayName || student.name,
-              age: student.age,
-              city: student.city,
-              gender: "Not specified",
-              weight: 65,
-              height: 170,
-              waterTarget: student.targets.water,
-              stepsTarget: student.targets.steps,
-              sleepTarget: student.targets.sleep,
-              email: currentUser.email || "",
-            };
+            // Initialize user doc using current profile or defaults
+            const currentGuest = profileData;
             const initialData: StudentProfileData = {
-              fullName: currentUser.displayName || currentGuest.fullName || student.name,
-              age: currentGuest.age || student.age,
-              city: currentGuest.city || student.city,
-              gender: currentGuest.gender || "Not specified",
-              weight: currentGuest.weight || 65,
-              height: currentGuest.height || 170,
-              waterTarget: currentGuest.waterTarget || student.targets.water,
-              stepsTarget: currentGuest.stepsTarget || student.targets.steps,
-              sleepTarget: currentGuest.sleepTarget || student.targets.sleep,
+              fullName: currentUser.displayName || currentGuest?.fullName || "Student",
+              age: currentGuest?.age || 19,
+              city: currentGuest?.city || "SRM Kattankulathur",
+              gender: currentGuest?.gender || "Not specified",
+              weight: currentGuest?.weight || 65,
+              height: currentGuest?.height || 170,
+              waterTarget: currentGuest?.waterTarget || student.targets.water,
+              stepsTarget: currentGuest?.stepsTarget || student.targets.steps,
+              sleepTarget: currentGuest?.sleepTarget || student.targets.sleep,
               email: currentUser.email || "",
               updatedAt: serverTimestamp(),
             };
@@ -123,6 +101,13 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (err) {
           console.warn("Could not fetch user document from Firestore:", err);
+        }
+      } else {
+        setProfileData(null);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem(GUEST_PROFILE_KEY);
+          } catch {}
         }
       }
       setLoading(false);
@@ -220,7 +205,19 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn("SignOut error:", err);
+    }
+    setUser(null);
+    setProfileData(null);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(GUEST_PROFILE_KEY);
+        localStorage.removeItem("syncare_user_city");
+      } catch {}
+    }
   };
 
   const updateUserProfileData = async (data: Partial<StudentProfileData>) => {
@@ -232,16 +229,22 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
     if (data.waterTarget !== undefined) cleanData.waterTarget = clampNumber(data.waterTarget, 500, 10000, 2500);
     if (data.stepsTarget !== undefined) cleanData.stepsTarget = clampNumber(data.stepsTarget, 1000, 100000, 10000);
     if (data.sleepTarget !== undefined) cleanData.sleepTarget = clampNumber(data.sleepTarget, 3, 14, 8);
+    if (data.gender !== undefined) cleanData.gender = sanitizeText(data.gender, 30);
+    if (data.weight !== undefined && data.weight > 0) cleanData.weight = clampNumber(data.weight, 20, 300, 65);
+    if (data.height !== undefined && data.height > 0) cleanData.height = clampNumber(data.height, 80, 250, 170);
 
     setProfileData((prev) => {
       const merged: StudentProfileData = {
-        fullName: cleanData.fullName ?? prev?.fullName ?? student.name,
-        age: cleanData.age ?? prev?.age ?? student.age,
-        city: cleanData.city ?? prev?.city ?? student.city,
+        fullName: cleanData.fullName ?? prev?.fullName ?? user?.displayName ?? "Student",
+        age: cleanData.age ?? prev?.age ?? 19,
+        city: cleanData.city ?? prev?.city ?? "SRM Kattankulathur",
+        gender: cleanData.gender ?? prev?.gender ?? "Not specified",
+        weight: cleanData.weight ?? prev?.weight ?? 65,
+        height: cleanData.height ?? prev?.height ?? 170,
         waterTarget: cleanData.waterTarget ?? prev?.waterTarget ?? student.targets.water,
         stepsTarget: cleanData.stepsTarget ?? prev?.stepsTarget ?? student.targets.steps,
         sleepTarget: cleanData.sleepTarget ?? prev?.sleepTarget ?? student.targets.sleep,
-        email: prev?.email ?? "",
+        email: prev?.email ?? user?.email ?? "",
       };
       if (typeof window !== "undefined") {
         try {
