@@ -32,6 +32,11 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
+async function loadMapLibre() {
+  const mod = await import("maplibre-gl");
+  return (mod as any).default?.Map ? (mod as any).default : mod;
+}
+
 export function CareMap({
   centerLat,
   centerLon,
@@ -55,7 +60,7 @@ export function CareMap({
       if (!containerRef.current || typeof window === "undefined") return;
 
       try {
-        const maplibregl = (await import("maplibre-gl")).default;
+        const maplibregl = await loadMapLibre();
 
         // Cleanup pre-existing instance if any
         if (mapInstanceRef.current) {
@@ -132,7 +137,7 @@ export function CareMap({
     const map = mapInstanceRef.current;
     if (!map || !isReady || typeof window === "undefined") return;
 
-    import("maplibre-gl").then(({ default: maplibregl }) => {
+    loadMapLibre().then((maplibregl) => {
       // Clear old markers
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
