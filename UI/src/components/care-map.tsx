@@ -101,10 +101,25 @@ export function CareMap({
           "bottom-left"
         );
 
-        map.on("load", () => {
+        const setReady = () => {
           if (!isCancelled) {
             setIsReady(true);
+            setTimeout(() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.resize();
+              }
+            }, 100);
           }
+        };
+
+        map.on("load", setReady);
+        map.on("style.load", setReady);
+
+        // Fallback: Ensure radar never hangs on loading screen
+        const readyTimer = setTimeout(setReady, 1000);
+
+        map.on("error", (e: any) => {
+          console.warn("OpenFreeMap event notice:", e?.error?.message || e);
         });
 
         // Trigger resize after mounting to ensure crisp canvas rendering
