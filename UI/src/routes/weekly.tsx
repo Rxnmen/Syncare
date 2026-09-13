@@ -38,21 +38,70 @@ function WeeklyPage() {
   const [activeChartMetric, setActiveChartMetric] = useState<"score-sleep" | "stress-exercise">("score-sleep");
 
   const kpis = useMemo(() => {
-    const n = weeklyTelemetry.length || 1;
-    const avgScore = Math.round(weeklyTelemetry.reduce((acc, d) => acc + d.score, 0) / n);
-    const avgSleepDec = weeklyTelemetry.reduce((acc, d) => acc + d.sleep, 0) / n;
+    const activeDays = weeklyTelemetry.filter(
+      (d) => d.score > 0 || d.steps > 0 || d.water > 0 || d.sleep > 0
+    );
+    const n = activeDays.length;
+
+    if (n === 0) {
+      return {
+        avgScore: 0,
+        avgSleepStr: "0h 00m",
+        avgSleepDec: 0,
+        avgWater: "0.0",
+        avgSteps: "0",
+        rawAvgSteps: 0,
+        activeDaysCount: 0,
+      };
+    }
+
+    const avgScore = Math.round(activeDays.reduce((acc, d) => acc + d.score, 0) / n);
+    const avgSleepDec = activeDays.reduce((acc, d) => acc + d.sleep, 0) / n;
     const avgSleepHrs = Math.floor(avgSleepDec);
     const avgSleepMins = Math.round((avgSleepDec - avgSleepHrs) * 60);
     const avgSleepStr = `${avgSleepHrs}h ${avgSleepMins < 10 ? `0${avgSleepMins}` : avgSleepMins}m`;
 
-    const avgWater = (weeklyTelemetry.reduce((acc, d) => acc + d.water, 0) / n).toFixed(1);
-    const avgSteps = Math.round(weeklyTelemetry.reduce((acc, d) => acc + d.steps, 0) / n).toLocaleString();
+    const avgWater = (activeDays.reduce((acc, d) => acc + d.water, 0) / n).toFixed(1);
+    const rawAvgSteps = Math.round(activeDays.reduce((acc, d) => acc + d.steps, 0) / n);
+    const avgSteps = rawAvgSteps.toLocaleString();
 
-    return { avgScore, avgSleepStr, avgWater, avgSteps };
+    return { avgScore, avgSleepStr, avgSleepDec, avgWater, avgSteps, rawAvgSteps, activeDaysCount: n };
   }, [weeklyTelemetry]);
 
+  const weekEyebrow = useMemo(() => {
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    const distanceToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distanceToMonday);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const fmtStart = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(monday);
+    const fmtEnd = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(sunday);
+    return `${fmtStart} – ${fmtEnd} · Campus Cycle`;
+  }, []);
+
+  const maxStepsDay = useMemo(() => {
+    return weeklyTelemetry.reduce((max, d) => (d.steps > max.steps ? d : max), {
+      day: "None",
+      steps: 0,
+      score: 0,
+      sleep: 0,
+      water: 0,
+      exercise: 0,
+      stress: 0,
+    });
+  }, [weeklyTelemetry]);
+
+  const waterTargetL = targets.water / 1000;
+  const waterDiff = (waterTargetL - Number(kpis.avgWater)).toFixed(1);
+  const sleepDiffMins = Math.round((targets.sleep - kpis.avgSleepDec) * 60);
+  const stepsDiff = targets.steps - kpis.rawAvgSteps;
+
   return (
-    <AppShell title="Weekly Telemetry & Report" eyebrow="8 – 14 September · Campus Cycle">
+    <AppShell title="Weekly Telemetry & Report" eyebrow={weekEyebrow}>
       <ScrollReveal direction="up" distance={14}>
         <PageHeading
           title="A week of steady, measured progress"
@@ -74,8 +123,15 @@ function WeeklyPage() {
             label: "Average Score",
             value: String(kpis.avgScore),
             unit: "/ 100",
-            note: "+4 pts vs last wk",
-            isPositive: true,
+            note:
+              kpis.activeDaysCount === 0
+                ? "Awaiting daily inputs"
+                : kpis.avgScore >= 80
+                ? "Optimal zone"
+                : kpis.avgScore >= 60
+                ? "Steady baseline"
+                : "Building momentum",
+            isPositive: kpis.avgScore >= 60,
             iconBg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
           },
           {
@@ -83,17 +139,27 @@ function WeeklyPage() {
             label: "Average Sleep",
             value: kpis.avgSleepStr,
             unit: "daily",
-            note: "18m less than target",
-            isPositive: false,
+            note:
+              kpis.activeDaysCount === 0
+                ? "No sleep logged"
+                : sleepDiffMins <= 0
+                ? "Target achieved"
+                : `${sleepDiffMins}m under target`,
+            isPositive: kpis.activeDaysCount > 0 && sleepDiffMins <= 0,
             iconBg: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
           },
           {
             icon: Droplets,
             label: "Daily Hydration",
             value: `${kpis.avgWater} L`,
-            unit: `/ ${(targets.water / 1000).toFixed(1)} L`,
-            note: "+0.2 L improvement",
-            isPositive: true,
+            unit: `/ ${waterTargetL.toFixed(1)} L`,
+            note:
+              kpis.activeDaysCount === 0
+                ? "No hydration logged"
+                : Number(kpis.avgWater) >= waterTargetL
+                ? "Target achieved"
+                : `${waterDiff} L to goal`,
+            isPositive: kpis.activeDaysCount > 0 && Number(kpis.avgWater) >= waterTargetL,
             iconBg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
           },
           {
@@ -101,8 +167,13 @@ function WeeklyPage() {
             label: "Average Daily Steps",
             value: kpis.avgSteps,
             unit: "steps",
-            note: "+11% activity spike",
-            isPositive: true,
+            note:
+              kpis.activeDaysCount === 0
+                ? "No steps logged"
+                : stepsDiff <= 0
+                ? "Goal completed"
+                : `${stepsDiff.toLocaleString()} to goal`,
+            isPositive: kpis.activeDaysCount > 0 && stepsDiff <= 0,
             iconBg: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
           },
         ].map((x, idx) => (
@@ -271,7 +342,7 @@ function WeeklyPage() {
                   <p className="text-xs text-muted-foreground">Daily step volume vs 10,000 baseline</p>
                 </div>
                 <span className="tnum text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                  Avg 8.0k
+                  Avg {kpis.activeDaysCount > 0 ? (kpis.rawAvgSteps / 1000).toFixed(1) : "0"}k
                 </span>
               </div>
 
@@ -313,8 +384,10 @@ function WeeklyPage() {
             </div>
 
             <div className="mt-4 pt-3 border-t border-border/50 flex justify-between text-xs text-muted-foreground">
-              <span>Goal: 10,000 steps/day</span>
-              <span className="font-semibold text-foreground">Highest: Sat (10,400)</span>
+              <span>Goal: {targets.steps.toLocaleString()} steps/day</span>
+              <span className="font-semibold text-foreground">
+                Highest: {maxStepsDay.steps > 0 ? `${maxStepsDay.day} (${maxStepsDay.steps.toLocaleString()})` : "No steps recorded"}
+              </span>
             </div>
           </section>
         </div>
@@ -336,16 +409,26 @@ function WeeklyPage() {
                   <span className="text-xs font-medium text-emerald-200">Confidence 94%</span>
                 </div>
                 <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-white">
-                  High mobility, subtle sleep deficit
+                  {kpis.activeDaysCount === 0
+                    ? "Awaiting weekly activity logs"
+                    : kpis.avgScore >= 75
+                    ? "High mobility and balanced recovery"
+                    : "Active weekly calibration in progress"}
                 </h3>
                 <p className="mt-3 text-sm leading-relaxed text-white/85">
-                  You maintained great daily hydration and exceeded physical activity targets on 5 out of 7 days. However, your weekday sleep onset drifted 24 minutes later each evening, creating a mild cognitive fatigue index by Friday afternoon.
+                  {kpis.activeDaysCount === 0
+                    ? "Welcome to Syncare! Your weekly circadian analysis and trend synthesis will appear here once daily biometric telemetry is recorded."
+                    : `You have recorded ${kpis.activeDaysCount} active day${kpis.activeDaysCount > 1 ? "s" : ""} this week with an average wellness score of ${kpis.avgScore}/100 and ${kpis.avgWater} L daily hydration.`}
                 </p>
               </div>
 
               <div className="mt-6 rounded-xl bg-white/10 p-3.5 backdrop-blur-xs border border-white/15 text-xs text-white/90 flex items-center justify-between">
-                <span>Key Win: Saturday Recovery Block</span>
-                <span className="font-bold text-emerald-200">8.1 hrs sleep + 10.4k steps</span>
+                <span>Key Highlight</span>
+                <span className="font-bold text-emerald-200">
+                  {maxStepsDay.steps > 0
+                    ? `${maxStepsDay.steps.toLocaleString()} steps on ${maxStepsDay.day}`
+                    : "Log daily activity to unlock highlights"}
+                </span>
               </div>
             </section>
           </Interactive3DCard>

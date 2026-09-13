@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, Check, Loader2, Plus, Sparkles, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
 import { MetricCard } from "@/components/metric-card";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import { QuickHealthHelp } from "@/components/quick-health-help";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Interactive3DCard } from "@/components/ui/interactive-3d-card";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { RadialGauge } from "@/components/ui/radial-gauge";
-import { useWellnessStore } from "@/lib/wellness-store";
+import { useWellnessStore, getTimeOfDayGreeting } from "@/lib/wellness-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { userName, wellnessScore, metrics, todayLog, parseAndLog, isSyncing } = useWellnessStore();
+  const { userName, wellnessScore, metrics, todayLog, parseAndLog, isSyncing, requiresOnboarding, completeOnboarding } = useWellnessStore();
   const [logFeedback, setLogFeedback] = useState<{ [key: string]: { message: string; success: boolean } }>({});
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [inputValues, setInputValues] = useState<{ [key: string]: string }>({});
@@ -63,10 +64,48 @@ function Index() {
     }
   };
 
+  const scoreDetails = useMemo(() => {
+    if (wellnessScore >= 80) {
+      return {
+        badge: "High momentum · Optimal range",
+        headline: "Outstanding balance today. You're in your peak zone.",
+        subtitle: "Biometric targets are well aligned. Maintain this steady rhythm into the evening.",
+        trend: "Optimal wellness zone",
+      };
+    }
+    if (wellnessScore >= 60) {
+      return {
+        badge: "Steady cadence · Target on track",
+        headline: "You’re doing well. A little more rest will go a long way.",
+        subtitle: "Your movement and hydration are on track. Keep pacing yourself through your study blocks.",
+        trend: "Steady daily progress",
+      };
+    }
+    if (wellnessScore > 0) {
+      return {
+        badge: "Early progress · Building momentum",
+        headline: "Day underway. Keep logging your steps and hydration.",
+        subtitle: "Every healthy choice counts. Continue drinking water and tracking your daily activity.",
+        trend: "Aim for 80+ pts today",
+      };
+    }
+    return {
+      badge: "New Day Ahead · Ready to Log",
+      headline: "Welcome to Syncare. Log your daily metrics to begin.",
+      subtitle: "Track your water, steps, sleep, and activity to monitor your circadian wellness score.",
+      trend: "Daily target: 80+ pts",
+    };
+  }, [wellnessScore]);
+
   const date = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
   return (
-    <AppShell title={`Good morning, ${userName}`} eyebrow={date}>
+    <AppShell title={`${getTimeOfDayGreeting()}, ${userName}`} eyebrow={date}>
+      <OnboardingModal
+        open={requiresOnboarding}
+        userName={userName}
+        onSubmit={completeOnboarding}
+      />
       <ScrollReveal direction="up" distance={16}>
         <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
           <Interactive3DCard maxTilt={2.5} className="rounded-2xl">
@@ -75,16 +114,16 @@ function Index() {
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs font-semibold backdrop-blur-md transition-transform group-hover:translate-z-10">
                     <Sparkles className="size-3.5 text-white animate-pulse" />
-                    <span>Today’s Wellness Score</span>
+                    <span>{scoreDetails.badge}</span>
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-200">
-                      <TrendingUp className="size-3" /> +4 pts vs yesterday
+                      <TrendingUp className="size-3" /> {scoreDetails.trend}
                     </span>
                   </div>
                   <h2 className="max-w-md font-display text-3xl font-bold leading-tight md:text-4xl text-white">
-                    You’re doing well. A little more rest will go a long way.
+                    {scoreDetails.headline}
                   </h2>
                   <p className="max-w-lg text-sm leading-relaxed text-white/80">
-                    Your movement and hydration are on track. Sleep is the clearest opportunity to improve today.
+                    {scoreDetails.subtitle}
                   </p>
                 </div>
 

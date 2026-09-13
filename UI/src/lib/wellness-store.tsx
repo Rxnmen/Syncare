@@ -51,6 +51,26 @@ export interface WellnessTargets {
   study: number;
 }
 
+export interface OnboardingMetrics {
+  water: number;
+  steps: number;
+  sleep: number;
+  exercise: number;
+  mood: string;
+  study?: number;
+}
+
+export function getTimeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return "Good morning";
+  }
+  if (hour >= 12 && hour < 17) {
+    return "Good afternoon";
+  }
+  return "Good evening";
+}
+
 export type FirestoreStatus = "ready" | "pending_setup" | "offline" | "syncing";
 
 interface WellnessContextType {
@@ -66,6 +86,8 @@ interface WellnessContextType {
   userName: string;
   userInitials: string;
   userCity: string;
+  requiresOnboarding: boolean;
+  completeOnboarding: (metrics: OnboardingMetrics) => Promise<void>;
   setUserCity: (city: string) => Promise<void>;
   logWater: (amountMl: number) => Promise<void>;
   logSteps: (count: number) => Promise<void>;
@@ -95,15 +117,15 @@ const HEALTH_RECORDS_PREFIX = "syncare_health_records_v3";
 
 export const DEFAULT_LOG: DailyWellnessLog = {
   date: getTodayDateKey(),
-  water: 1800,
-  steps: 7240,
-  sleep: 6.67,
-  exercise: 45,
+  water: 0,
+  steps: 0,
+  sleep: 0,
+  exercise: 0,
   stress: "Moderate",
-  study: 3.33,
-  mood: "Focused",
-  meals: ["Healthy Snack", "Balanced Lunch"],
-  precautions: ["hydration"],
+  study: 0,
+  mood: "Neutral",
+  meals: [],
+  precautions: [],
 };
 
 export const DEFAULT_HEALTH_RECORDS: HealthRecord[] = [
@@ -122,9 +144,9 @@ function sanitizeLog(raw: any, dateKey: string): DailyWellnessLog {
     exercise: Math.min(Math.max(Number(raw.exercise) || 0, 0), 720),
     stress: ["Low", "Moderate", "High"].includes(raw.stress) ? raw.stress : "Moderate",
     study: Math.min(Math.max(Number(raw.study) || 0, 0), 24),
-    mood: typeof raw.mood === "string" ? raw.mood.slice(0, 50) : "Focused",
+    mood: typeof raw.mood === "string" && raw.mood ? raw.mood.slice(0, 50) : "Neutral",
     meals: Array.isArray(raw.meals) ? raw.meals.map((m: any) => String(m).slice(0, 80)).slice(0, 20) : [],
-    precautions: Array.isArray(raw.precautions) ? raw.precautions.map((p: any) => String(p).slice(0, 50)).slice(0, 20) : ["hydration"],
+    precautions: Array.isArray(raw.precautions) ? raw.precautions.map((p: any) => String(p).slice(0, 50)).slice(0, 20) : [],
   };
 }
 
@@ -147,6 +169,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   });
 
   const [historicalLogs, setHistoricalLogs] = useState<Record<string, DailyWellnessLog>>({});
+  const [requiresOnboarding, setRequiresOnboarding] = useState(false);
 
   const [completedMilestones, setCompletedMilestones] = useState<Record<number, boolean>>(() => {
     if (typeof window !== "undefined") {
@@ -203,6 +226,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     async function loadFirestoreData() {
       if (!user) {
         setFirestoreStatus("offline");
+        setRequiresOnboarding(false);
         return;
       }
 
@@ -210,41 +234,46 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         setIsSyncing(true);
         setFirestoreStatus("syncing");
 
-        // 1. Fetch Today's Daily Log
-        const logDocRef = doc(db, "users", user.uid, "daily_logs", todayKey);
-        const snap = await getDoc(logDocRef);
+        // 1. Fetch all Daily Logs to perform Empty-State check
+        const logsCol = collection(db, "users", user.uid, "daily_logs");
+        const allLogsSnap = await getDocs(logsCol);
 
         if (!isCancelled) {
-          if (snap.exists()) {
-            const remoteData = sanitizeLog(snap.data(), todayKey);
-            setTodayLog(remoteData);
-            localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(remoteData));
-          } else {
-            // Upload current initial log to Firestore
-            const clean = sanitizeLog(todayLog, todayKey);
-            await setDoc(logDocRef, { ...clean, updatedAt: serverTimestamp() }, { merge: true });
+          if (allLogsSnap.empty) {
+            // Brand new account: No logs in Firestore -> Trigger onboarding modal
+            setRequiresOnboarding(true);
+            setTodayLog({ ...DEFAULT_LOG, date: todayKey });
+            setHistoricalLogs({});
+            setFirestoreStatus("ready");
+            setIsSyncing(false);
+            return;
           }
+
+          // Existing account: Onboarding already satisfied
+          setRequiresOnboarding(false);
+          const historyMap: Record<string, DailyWellnessLog> = {};
+          let foundToday = false;
+
+          allLogsSnap.forEach((docSnap) => {
+            const data = sanitizeLog(docSnap.data(), docSnap.id);
+            historyMap[docSnap.id] = data;
+            if (docSnap.id === todayKey) {
+              foundToday = true;
+              setTodayLog(data);
+              localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(data));
+            }
+          });
+
+          if (!foundToday) {
+            // User has history, but has not logged metrics for today yet
+            setTodayLog({ ...DEFAULT_LOG, date: todayKey });
+          }
+
+          setHistoricalLogs(historyMap);
           setFirestoreStatus("ready");
         }
 
-        // 2. Fetch Historical Logs (last 7 days)
-        try {
-          const logsCol = collection(db, "users", user.uid, "daily_logs");
-          const q = query(logsCol, orderBy("date", "desc"), limit(7));
-          const querySnap = await getDocs(q);
-          if (!isCancelled && !querySnap.empty) {
-            const historyMap: Record<string, DailyWellnessLog> = {};
-            querySnap.forEach((docSnap) => {
-              const data = sanitizeLog(docSnap.data(), docSnap.id);
-              historyMap[docSnap.id] = data;
-            });
-            setHistoricalLogs(historyMap);
-          }
-        } catch (hErr) {
-          console.warn("Could not query historical daily_logs:", hErr);
-        }
-
-        // 3. Fetch User Milestones
+        // 2. Fetch User Milestones
         const userDocRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userDocRef);
         if (!isCancelled && userSnap.exists()) {
@@ -255,7 +284,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 4. Fetch Health Records Subcollection
+        // 3. Fetch Health Records Subcollection
         try {
           const healthCol = collection(db, "users", user.uid, "health_records");
           const healthSnap = await getDocs(healthCol);
@@ -346,6 +375,61 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       }
     },
     [user, todayKey]
+  );
+
+  // Complete onboarding by writing starting metrics
+  const completeOnboarding = useCallback(
+    async (initialMetrics: OnboardingMetrics) => {
+      let stress: "Low" | "Moderate" | "High" = "Moderate";
+      if (initialMetrics.mood === "Energized" || initialMetrics.mood === "Calm") stress = "Low";
+      else if (initialMetrics.mood === "Tired") stress = "High";
+
+      const newLog: DailyWellnessLog = {
+        date: todayKey,
+        water: Math.max(0, initialMetrics.water),
+        steps: Math.max(0, initialMetrics.steps),
+        sleep: Math.max(0, initialMetrics.sleep),
+        exercise: Math.max(0, initialMetrics.exercise),
+        study: Math.max(0, initialMetrics.study || 0),
+        stress,
+        mood: initialMetrics.mood || "Focused",
+        meals: ["Healthy Meal"],
+        precautions: ["hydration"],
+      };
+
+      setTodayLog(newLog);
+      setHistoricalLogs((prev) => ({ ...prev, [todayKey]: newLog }));
+      setRequiresOnboarding(false);
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`${STORAGE_PREFIX}_${todayKey}`, JSON.stringify(newLog));
+        } catch (err) {
+          console.warn("Could not save to localStorage:", err);
+        }
+      }
+
+      if (user) {
+        try {
+          setIsSyncing(true);
+          const logDocRef = doc(db, "users", user.uid, "daily_logs", todayKey);
+          await setDoc(
+            logDocRef,
+            {
+              ...newLog,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+          setFirestoreStatus("ready");
+        } catch (err) {
+          console.warn("Could not sync onboarding log to Firestore:", err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    },
+    [todayKey, user]
   );
 
   // Persistence handler for milestones
@@ -568,6 +652,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
 
   // Dynamic wellness score computed directly from real logs vs targets
   const wellnessScore = useMemo(() => {
+    if (todayLog.water === 0 && todayLog.steps === 0 && todayLog.sleep === 0 && todayLog.exercise === 0) {
+      return 0;
+    }
     const waterScore = Math.min(1, todayLog.water / Math.max(targets.water, 1)) * 25;
     const stepsScore = Math.min(1, todayLog.steps / Math.max(targets.steps, 1)) * 30;
     const sleepScore = Math.min(1, todayLog.sleep / Math.max(targets.sleep, 1)) * 25;
@@ -582,22 +669,38 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     const waterLiters = (todayLog.water / 1000).toFixed(1);
     const waterTargetL = (targets.water / 1000).toFixed(1);
     const waterProgress = Math.min(100, Math.round((todayLog.water / targets.water) * 100));
-    const waterTrend = todayLog.water >= targets.water ? "Daily goal met!" : `+${waterLiters} L logged today`;
+    const waterTrend = todayLog.water >= targets.water
+      ? "Daily goal met!"
+      : todayLog.water > 0
+      ? `+${waterLiters} L logged today`
+      : "No water logged today";
 
     // Steps
     const stepsProgress = Math.min(100, Math.round((todayLog.steps / targets.steps) * 100));
-    const stepsTrend = todayLog.steps >= targets.steps ? "Goal completed!" : `${stepsProgress}% of daily goal`;
+    const stepsTrend = todayLog.steps >= targets.steps
+      ? "Goal completed!"
+      : todayLog.steps > 0
+      ? `${stepsProgress}% of daily goal`
+      : "No steps recorded today";
 
     // Sleep
     const sleepHours = Math.floor(todayLog.sleep);
     const sleepMins = Math.round((todayLog.sleep - sleepHours) * 60);
-    const sleepDisplay = `${sleepHours}h ${sleepMins > 0 ? `${sleepMins}m` : ""}`.trim();
+    const sleepDisplay = todayLog.sleep > 0 ? `${sleepHours}h ${sleepMins > 0 ? `${sleepMins}m` : ""}`.trim() : "0h";
     const sleepProgress = Math.min(100, Math.round((todayLog.sleep / targets.sleep) * 100));
-    const sleepTrend = todayLog.sleep >= targets.sleep ? "Full rest achieved" : `${(targets.sleep - todayLog.sleep).toFixed(1)}h less than target`;
+    const sleepTrend = todayLog.sleep >= targets.sleep
+      ? "Full rest achieved"
+      : todayLog.sleep > 0
+      ? `${(targets.sleep - todayLog.sleep).toFixed(1)}h less than target`
+      : "No sleep logged today";
 
     // Exercise
     const exerciseProgress = Math.min(100, Math.round((todayLog.exercise / targets.exercise) * 100));
-    const exerciseTrend = todayLog.exercise >= targets.exercise ? "Activity target met!" : `${todayLog.exercise} min logged`;
+    const exerciseTrend = todayLog.exercise >= targets.exercise
+      ? "Activity target met!"
+      : todayLog.exercise > 0
+      ? `${todayLog.exercise} min logged`
+      : "No workout logged today";
 
     // Stress
     const stressScoreMap = { Low: 85, Moderate: 58, High: 32 };
@@ -606,7 +709,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     // Study
     const studyHours = Math.floor(todayLog.study);
     const studyMins = Math.round((todayLog.study - studyHours) * 60);
-    const studyDisplay = `${studyHours}h ${studyMins > 0 ? `${studyMins}m` : ""}`.trim();
+    const studyDisplay = todayLog.study > 0 ? `${studyHours}h ${studyMins > 0 ? `${studyMins}m` : ""}`.trim() : "0h";
     const studyProgress = Math.min(100, Math.round((todayLog.study / targets.study) * 100));
 
     return [
@@ -651,7 +754,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         value: todayLog.stress,
         target: "Aim for low",
         progress: stressScoreMap[todayLog.stress] || 58,
-        trend: `Mood: ${todayLog.mood}`,
+        trend: todayLog.mood !== "Neutral" ? `Mood: ${todayLog.mood}` : "Awaiting check-in",
         tone: stressTone,
         icon: Brain,
       },
@@ -660,34 +763,64 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         value: studyDisplay,
         target: `${targets.study}h focus goal`,
         progress: studyProgress,
-        trend: "Active focus tracking",
+        trend: todayLog.study > 0 ? "Active focus tracking" : "No study blocks logged",
         tone: "blue",
         icon: BookOpen,
       },
     ];
   }, [todayLog, targets]);
 
-  // Synchronized weekly telemetry incorporating today's live metrics + historical logs
+  // Synchronized weekly telemetry calculated dynamically from current week's real logs
   const weeklyTelemetry = useMemo(() => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const currentDay = days[new Date().getDay()];
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    const distanceToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distanceToMonday);
 
-    return weeklyData.map((d) => {
-      if (d.day === currentDay) {
+    const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    return dayNames.map((dayName, idx) => {
+      const dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + idx);
+      const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, "0")}-${String(dayDate.getDate()).padStart(2, "0")}`;
+
+      let logForDay: DailyWellnessLog | undefined;
+      if (dateStr === todayKey) {
+        logForDay = todayLog;
+      } else if (historicalLogs[dateStr]) {
+        logForDay = historicalLogs[dateStr];
+      }
+
+      if (logForDay && (logForDay.water > 0 || logForDay.steps > 0 || logForDay.sleep > 0 || logForDay.exercise > 0)) {
+        const waterScore = Math.min(1, logForDay.water / Math.max(targets.water, 1)) * 25;
+        const stepsScore = Math.min(1, logForDay.steps / Math.max(targets.steps, 1)) * 30;
+        const sleepScore = Math.min(1, logForDay.sleep / Math.max(targets.sleep, 1)) * 25;
+        const exerciseScore = Math.min(1, logForDay.exercise / Math.max(targets.exercise, 1)) * 20;
+        const score = Math.round(waterScore + stepsScore + sleepScore + exerciseScore);
+
         return {
-          ...d,
-          score: wellnessScore,
-          sleep: Number(todayLog.sleep.toFixed(1)),
-          water: Number((todayLog.water / 1000).toFixed(1)),
-          steps: todayLog.steps,
-          exercise: todayLog.exercise,
-          stress: todayLog.stress === "Low" ? 35 : todayLog.stress === "Moderate" ? 55 : 75,
+          day: dayName,
+          score,
+          sleep: Number(logForDay.sleep.toFixed(1)),
+          water: Number((logForDay.water / 1000).toFixed(1)),
+          steps: logForDay.steps,
+          exercise: logForDay.exercise,
+          stress: logForDay.stress === "Low" ? 30 : logForDay.stress === "Moderate" ? 50 : 75,
         };
       }
-      // Check if historical log exists for previous days
-      return d;
+
+      // Day with no log entered yet
+      return {
+        day: dayName,
+        score: 0,
+        sleep: 0,
+        water: 0,
+        steps: 0,
+        exercise: 0,
+        stress: 0,
+      };
     });
-  }, [todayLog, wellnessScore]);
+  }, [todayKey, todayLog, historicalLogs, targets]);
 
   const userName = profileData?.fullName || user?.displayName || student.name;
   const userCity = customCity || profileData?.city || student.city || "SRM Kattankulathur";
@@ -742,6 +875,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         userName,
         userInitials,
         userCity,
+        requiresOnboarding,
+        completeOnboarding,
         setUserCity,
         logWater,
         logSteps,
