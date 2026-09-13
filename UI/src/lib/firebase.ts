@@ -21,6 +21,7 @@ export const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 // Safe client-side analytics initialization
 let analytics: Analytics | null = null;
@@ -38,3 +39,4 @@ if (typeof window !== "undefined") {
 }
 
 export { analytics };
+export default app;
