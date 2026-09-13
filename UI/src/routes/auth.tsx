@@ -45,6 +45,11 @@ function formatFirebaseError(err: unknown): string {
         return "Google sign-in popup was closed before completion.";
       case "auth/too-many-requests":
         return "Too many unsuccessful attempts. Please wait a few minutes.";
+      case "auth/configuration-not-found":
+      case "auth/operation-not-allowed":
+        return "Firebase Authentication is not yet enabled in your Firebase Console. Go to Firebase Console > Authentication > Sign-in method and enable 'Email/Password'.";
+      case "permission-denied":
+        return "Firestore permission denied. Please verify your Firestore Security Rules in the Firebase Console.";
       default:
         return err.message.replace(/^Firebase:\s*/, "");
     }
