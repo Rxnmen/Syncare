@@ -274,13 +274,13 @@ function Index() {
 
       <QuickHealthHelp />
 
-      {/* Groq AI Daily Recommendations Dialog */}
+      {/* Syncare AI Daily Recommendations Dialog */}
       <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2 text-xs font-bold text-coral uppercase tracking-wider">
               <Sparkles className="size-4" />
-              <span>Groq AI Daily Recommendations</span>
+              <span>Syncare AI Recommendations</span>
             </div>
             <DialogTitle className="font-display text-xl font-bold">Personalized for {userName}</DialogTitle>
             <DialogDescription>
@@ -292,7 +292,7 @@ function Index() {
             {aiLoading ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
                 <Loader2 className="size-6 animate-spin text-coral" />
-                <span className="text-xs font-medium">Analyzing today's biometrics via Groq...</span>
+                <span className="text-xs font-medium">Analyzing today's biometrics via Syncare AI...</span>
               </div>
             ) : (
               <div className="rounded-xl border border-coral/20 bg-coral/5 p-4 text-xs leading-relaxed text-foreground whitespace-pre-line">
@@ -301,8 +301,7 @@ function Index() {
             )}
           </div>
 
-          <div className="flex justify-between items-center pt-2">
-            <span className="text-[10px] text-muted-foreground font-mono">llama-3.3-70b-versatile</span>
+          <div className="flex justify-end items-center pt-2">
             <Button size="sm" onClick={() => setShowAiDialog(false)}>
               Got it
             </Button>

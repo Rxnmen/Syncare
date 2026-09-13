@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { healthHelp, type HealthTopic } from "@/lib/mock-data";
 import { useWellnessStore } from "@/lib/wellness-store";
+import { getDynamicHomeRemedies } from "@/lib/home-remedies";
 
 export function QuickHealthHelp() {
   const { todayLog, userCity } = useWellnessStore();
@@ -25,9 +26,9 @@ export function QuickHealthHelp() {
   const content = healthHelp[selected];
 
   const fetchAiAdvice = async (customPrompt?: string) => {
+    const rawInput = (customPrompt || customQuestion).trim();
     const promptText =
-      customPrompt ||
-      customQuestion.trim() ||
+      rawInput ||
       `I am a university student at ${userCity || "SRM Kattankulathur"} experiencing symptoms of ${selected}. Typical contributing factors include ${content.factors}. What practical self-care steps, hydration tips, and lifestyle adjustments should I take today?`;
 
     setAiLoading(true);
@@ -54,15 +55,19 @@ export function QuickHealthHelp() {
       }
 
       const data = await res.json();
-      setAiResponse(data.text || "No guidance available at this time.");
-      setAiModel(data.model || "llama-3.3-70b-versatile");
+      if (!data.text || data.text.includes("Could not contact") || data.text.includes("Syncare AI service is momentarily busy")) {
+        throw new Error("Fallback requested");
+      }
+      setAiResponse(data.text);
+      setAiModel("Syncare AI");
       setCustomQuestion("");
     } catch (err: any) {
-      console.warn("AI help request error:", err);
-      setAiResponse(
-        "Could not contact AI service. Maintain gentle hydration, rest in a cool shaded room, and visit the Campus Triage Desk if discomfort continues."
-      );
-      setAiModel("Offline Safe Fallback");
+      console.warn("AI help request error, activating dynamic home remedies fallback:", err);
+      const query = rawInput || selected;
+      const remedies = getDynamicHomeRemedies(query, selected, userCity || "SRM Kattankulathur");
+      setAiResponse(remedies);
+      setAiModel("Home Care Guidance");
+      setCustomQuestion("");
     } finally {
       setAiLoading(false);
     }
@@ -94,7 +99,7 @@ export function QuickHealthHelp() {
           </div>
           <SheetTitle className="pt-3 font-display text-2xl">Quick Health Help</SheetTitle>
           <SheetDescription>
-            General self-care guidance and Groq AI assistance for student wellness.
+            General self-care guidance and AI assistance for student wellness.
           </SheetDescription>
         </SheetHeader>
 
@@ -133,16 +138,16 @@ export function QuickHealthHelp() {
             </div>
           </section>
 
-          {/* Groq AI Interactive Assistance */}
+          {/* Syncare AI Interactive Assistance */}
           <section className="card-3d p-5 rounded-2xl border border-primary/30 bg-primary/5 space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
                 <Sparkles className="size-4" />
-                <span>Syncare Groq AI Assistant</span>
+                <span>Syncare AI Assistant</span>
               </div>
               {aiModel && (
                 <span className="text-[10px] font-mono text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
-                  {aiModel.replace("llama-3.3-70b-versatile", "Llama 3.3 (70B)")}
+                  {aiModel.replace("llama-3.3-70b-versatile", "Syncare AI")}
                 </span>
               )}
             </div>
@@ -180,14 +185,14 @@ export function QuickHealthHelp() {
                 className="tactile-btn w-full gap-2 border-primary/30 text-primary hover:bg-primary/10"
               >
                 <Sparkles className="size-3.5" />
-                {aiLoading ? "Consulting AI..." : `Get Groq AI Guidance for ${selected}`}
+                {aiLoading ? "Consulting AI..." : `Get AI Guidance for ${selected}`}
               </Button>
             )}
 
             {aiLoading && (
               <div className="py-4 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="size-5 animate-spin text-primary" />
-                <span className="text-xs font-medium">Generating student health guidance via Groq...</span>
+                <span className="text-xs font-medium">Generating student health guidance via Syncare AI...</span>
               </div>
             )}
 

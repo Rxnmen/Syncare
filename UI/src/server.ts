@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { getDynamicHomeRemedies } from "./lib/home-remedies";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -77,23 +78,15 @@ async function handleAiRequest(request: Request, env: unknown): Promise<Response
     const groqApiKey = (process.env.GROQ_API_KEY || (env as any)?.GROQ_API_KEY || "").trim();
 
     if (!groqApiKey || groqApiKey === "gsk_your_groq_api_key_here") {
-      // Return helpful contextual wellness guidance when API key is pending configuration
-      const fallbackTopic = prompt.toLowerCase();
-      let guidance = "Stay hydrated and rest well. For student wellness at SRM Kattankulathur, make sure to drink at least 2.5–3.0 L of water in hot weather and aim for 7–8 hours of uninterrupted sleep.";
-      if (fallbackTopic.includes("headache")) {
-        guidance = "Headaches in campus environments are commonly triggered by screen fatigue, dehydration, or irregular sleep cycles. Rehydrate with 500 ml of water, step away from digital displays for 20 minutes in a dim room, and practice slow diaphragmatic breathing.";
-      } else if (fallbackTopic.includes("sleep") || fallbackTopic.includes("insomnia") || fallbackTopic.includes("tired")) {
-        guidance = "Prioritize winding down 30–45 minutes before sleep. Minimize blue light exposure, keep your room cool, and maintain a fixed waking time to anchor your circadian rhythm.";
-      } else if (fallbackTopic.includes("stress") || fallbackTopic.includes("anxiety") || fallbackTopic.includes("exam")) {
-        guidance = "Practice 4-7-8 breathing: inhale for 4s, hold for 7s, exhale slowly for 8s. Take a 10-minute walk through the campus green quad and prioritize one academic task at a time.";
-      } else if (fallbackTopic.includes("heat") || fallbackTopic.includes("sun") || fallbackTopic.includes("uv") || fallbackTopic.includes("weather")) {
-        guidance = "High solar radiance requires consistent electrolyte intake and UV protection. Seek shaded walkways between campus buildings between 12 PM and 3 PM.";
-      }
-
+      const guidance = getDynamicHomeRemedies(
+        prompt,
+        body.context?.topic,
+        body.context?.campus || "SRM Kattankulathur"
+      );
       return new Response(
         JSON.stringify({
           text: guidance,
-          model: "syncare-wellness-engine (fallback: add GROQ_API_KEY for live Llama 3.3)",
+          model: "Syncare AI (Home Care Guidance)",
           isFallback: true,
           success: true,
         }),
@@ -131,15 +124,21 @@ Rules:
 
     if (!groqResponse.ok) {
       const errText = await groqResponse.text();
-      console.error("Groq API error:", groqResponse.status, errText);
+      console.warn("Groq API error, falling back to dynamic home remedies:", groqResponse.status, errText);
+      const guidance = getDynamicHomeRemedies(
+        prompt,
+        body.context?.topic,
+        body.context?.campus || "SRM Kattankulathur"
+      );
       return new Response(
         JSON.stringify({
-          error: `Groq API responded with status ${groqResponse.status}`,
-          text: "Syncare AI service is momentarily busy. Maintain your hydration and rest targets, and try again in a moment.",
-          success: false,
+          text: guidance,
+          model: "Syncare AI (Home Care Guidance)",
+          isFallback: true,
+          success: true,
         }),
         {
-          status: 502,
+          status: 200,
           headers: { "Content-Type": "application/json" },
         }
       );
