@@ -57,7 +57,7 @@ function formatFirebaseError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
 }
 
-function AuthPage() {
+export function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [show, setShow] = useState(false);
   const [message, setMessage] = useState("");

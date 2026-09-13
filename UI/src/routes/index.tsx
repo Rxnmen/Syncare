@@ -14,6 +14,7 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { RadialGauge } from "@/components/ui/radial-gauge";
 import { useWellnessStore, getTimeOfDayGreeting } from "@/lib/wellness-store";
 import { useFirebaseAuth } from "@/lib/firebase-auth";
+import { AuthPage } from "./auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,15 +31,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { user, loading: authLoading } = useFirebaseAuth();
-  const navigate = useNavigate();
+  const { user } = useFirebaseAuth();
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate({ to: "/auth", replace: true });
-    }
-  }, [authLoading, user, navigate]);
+  if (user) {
+    return <DashboardContent />;
+  }
 
+  return <AuthPage />;
+}
+
+function DashboardContent() {
   const {
     userName,
     wellnessScore,

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Bell, CalendarDays, CloudSun, HeartPulse, Home, LineChart, Moon, Quote, Settings, Sparkles, Sun } from "lucide-react";
+import { Bell, CalendarDays, CloudSun, HeartPulse, Home, LineChart, LogOut, Moon, Quote, Settings, Sparkles, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useWellnessStore } from "@/lib/wellness-store";
 import { useTheme } from "@/lib/theme";
@@ -16,7 +16,7 @@ const items = [
 export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow: string }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, loading } = useFirebaseAuth();
+  const { user, loading, logout } = useFirebaseAuth();
   const [scrolled, setScrolled] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
   const { isDark, toggleTheme } = useTheme();
@@ -122,6 +122,18 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
           <p className="mt-2 text-xs font-medium leading-relaxed text-muted-foreground">
             Small, steady habits compound into lifelong resilience. Prioritize rest when your body signals.
           </p>
+        </div>
+
+        {/* Sidebar Sign Out */}
+        <div className="mt-3 pt-3 border-t border-border/60">
+          <button
+            type="button"
+            onClick={logout}
+            className="group flex w-full h-10 items-center gap-3 rounded-xl px-3.5 text-xs font-semibold text-coral hover:bg-coral-soft/50 transition-all active:scale-[0.98]"
+          >
+            <LogOut className="size-4" />
+            Sign Out
+          </button>
         </div>
       </aside>
 
