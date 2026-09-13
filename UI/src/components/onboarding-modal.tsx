@@ -28,6 +28,9 @@ interface OnboardingModalProps {
 }
 
 export function OnboardingModal({ open, userName, onSubmit }: OnboardingModalProps) {
+  const [gender, setGender] = useState("Male");
+  const [weight, setWeight] = useState("65");
+  const [height, setHeight] = useState("170");
   const [water, setWater] = useState("1000");
   const [steps, setSteps] = useState("3500");
   const [sleep, setSleep] = useState("7.0");
@@ -35,6 +38,10 @@ export function OnboardingModal({ open, userName, onSubmit }: OnboardingModalPro
   const [mood, setMood] = useState("Focused");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const weightNum = parseFloat(weight) || 0;
+  const heightNum = parseFloat(height) || 0;
+  const bmiPreview = weightNum > 0 && heightNum > 0 ? (weightNum / ((heightNum / 100) ** 2)).toFixed(1) : "0.0";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +68,14 @@ export function OnboardingModal({ open, userName, onSubmit }: OnboardingModalPro
       setError("Please enter valid exercise minutes.");
       return;
     }
+    if (weightNum <= 20 || weightNum > 300) {
+      setError("Please enter a valid body weight between 20 kg and 300 kg.");
+      return;
+    }
+    if (heightNum <= 80 || heightNum > 250) {
+      setError("Please enter a valid height between 80 cm and 250 cm.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -70,6 +85,9 @@ export function OnboardingModal({ open, userName, onSubmit }: OnboardingModalPro
         sleep: sleepNum,
         exercise: exerciseNum,
         mood,
+        gender,
+        weight: weightNum,
+        height: heightNum,
       });
     } catch (err: any) {
       setError(err?.message || "Could not save baseline metrics. Please try again.");
@@ -87,17 +105,111 @@ export function OnboardingModal({ open, userName, onSubmit }: OnboardingModalPro
         <DialogHeader className="space-y-3 text-left">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 w-fit">
             <Sparkles className="size-3.5 animate-pulse text-emerald-500" />
-            <span>Initial Baseline Calibration</span>
+            <span>Biometric Profile & Calibration</span>
           </div>
           <DialogTitle className="font-display text-2xl md:text-3xl font-bold tracking-tight text-foreground">
             Welcome to Syncare, {userName || "Student"}!
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            To calibrate your circadian wellness score and dashboard accurately, please log your starting metrics for today.
+            Set your gender, body dimensions, and starting metrics to calibrate your circadian analysis, BMI, and personalized daily baselines.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+          {/* Gender, Body Weight & Height */}
+          <div className="space-y-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold text-foreground flex items-center gap-2">
+                <span>Body Composition & Gender</span>
+              </Label>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                BMI: {bmiPreview}
+              </span>
+            </div>
+
+            {/* Gender options */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-medium">Biological / Care Gender</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: "Male", icon: "👨" },
+                  { label: "Female", icon: "👩" },
+                  { label: "Non-Binary", icon: "⚧" },
+                  { label: "Other", icon: "👤" },
+                ].map((g) => (
+                  <button
+                    key={g.label}
+                    type="button"
+                    onClick={() => setGender(g.label)}
+                    className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-xs font-semibold transition-all ${
+                      gender === g.label
+                        ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                        : "border-border/70 bg-background/80 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>{g.icon}</span>
+                    <span>{g.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Weight & Height inputs */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">Body Weight (kg)</Label>
+                <Input
+                  type="number"
+                  min="20"
+                  max="300"
+                  required
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="e.g. 65"
+                  className="h-9 bg-background/80"
+                />
+                <div className="flex flex-wrap gap-1">
+                  {[55, 65, 75, 85].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setWeight(String(w))}
+                      className="rounded px-1.5 py-0.5 text-[11px] border border-border/60 bg-background text-muted-foreground hover:text-foreground"
+                    >
+                      {w}kg
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">Height (cm)</Label>
+                <Input
+                  type="number"
+                  min="80"
+                  max="250"
+                  required
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  placeholder="e.g. 170"
+                  className="h-9 bg-background/80"
+                />
+                <div className="flex flex-wrap gap-1">
+                  {[160, 170, 175, 180].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setHeight(String(h))}
+                      className="rounded px-1.5 py-0.5 text-[11px] border border-border/60 bg-background text-muted-foreground hover:text-foreground"
+                    >
+                      {h}cm
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Water Intake */}
           <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-4">
             <div className="flex items-center justify-between">

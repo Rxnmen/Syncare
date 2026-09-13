@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { BellRing, LockKeyhole, LogOut, Ruler, Save, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppShell, PageHeading } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +29,35 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   const { user, profileData, logout, updateUserProfileData } = useFirebaseAuth();
-  const { setUserCity } = useWellnessStore();
+  const { setUserCity, userGender, userWeight, userHeight, updateBodyMetrics, targets } = useWellnessStore();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+
+  const [selectedGender, setSelectedGender] = useState<string>(profileData?.gender || userGender || "Male");
+  const [weight, setWeight] = useState<number>(profileData?.weight || userWeight || 65);
+  const [height, setHeight] = useState<number>(profileData?.height || userHeight || 170);
+
+  useEffect(() => {
+    if (profileData?.gender) setSelectedGender(profileData.gender);
+    if (profileData?.weight) setWeight(profileData.weight);
+    if (profileData?.height) setHeight(profileData.height);
+  }, [profileData]);
+
+  const bmi = useMemo(() => {
+    if (!height || !weight || height <= 0) return "22.5";
+    const heightM = height / 100;
+    return (weight / (heightM * heightM)).toFixed(1);
+  }, [weight, height]);
+
+  const bmiCategory = useMemo(() => {
+    const val = parseFloat(bmi);
+    if (isNaN(val)) return "Normal / Optimal";
+    if (val < 18.5) return "Underweight";
+    if (val < 25) return "Normal / Optimal";
+    if (val < 30) return "Overweight";
+    return "Obese";
+  }, [bmi]);
 
   const handleLogout = async () => {
     await logout();
@@ -46,6 +71,8 @@ function ProfilePage() {
     const name = String(fd.get("name") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim().slice(0, 100);
     const city = String(fd.get("city") ?? "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim().slice(0, 100);
     const age = Math.min(Math.max(Number(fd.get("age")) || 19, 13), 100);
+    const w = Math.min(Math.max(Number(fd.get("weight")) || weight || 65, 20), 300);
+    const h = Math.min(Math.max(Number(fd.get("height")) || height || 170, 80), 250);
     const water = Math.min(Math.max(Number(fd.get("water")) || 2500, 500), 10000);
     const steps = Math.min(Math.max(Number(fd.get("steps")) || 10000, 1000), 100000);
     const sleep = Math.min(Math.max(Number(fd.get("sleep")) || 8, 3), 14);
@@ -54,10 +81,14 @@ function ProfilePage() {
       fullName: name || student.name,
       age,
       city: city || student.city,
+      gender: selectedGender,
+      weight: w,
+      height: h,
       waterTarget: water,
       stepsTarget: steps,
       sleepTarget: sleep,
     });
+    await updateBodyMetrics(selectedGender, w, h);
     if (city) {
       await setUserCity(city);
     }
@@ -144,6 +175,97 @@ function ProfilePage() {
                 </div>
               </div>
 
+              {/* Physiological Profile & Biometrics */}
+              <div className="mt-8 pt-6 border-t border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-display text-lg font-bold tracking-tight">Physiological Profile</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Calibrates body composition, BMI, and daily hydration baselines.</p>
+                  </div>
+                  <span
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                      bmiCategory === "Normal / Optimal"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                    }`}
+                  >
+                    BMI {bmi} · {bmiCategory}
+                  </span>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                      Biological / Care Gender
+                    </Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {["Male", "Female", "Non-Binary", "Other"].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => setSelectedGender(g)}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+                            selectedGender === g
+                              ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                              : "bg-card hover:bg-muted/60 text-muted-foreground border-border/70"
+                          }`}
+                        >
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="weight" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Body Weight (kg)
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">Range: 20–300 kg</span>
+                      </div>
+                      <Input
+                        id="weight"
+                        name="weight"
+                        type="number"
+                        min={20}
+                        max={300}
+                        value={weight}
+                        onChange={(e) => setWeight(Number(e.target.value) || 0)}
+                        className="h-11 rounded-xl bg-card shadow-xs"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="height" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Height (cm)
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">Range: 80–250 cm</span>
+                      </div>
+                      <Input
+                        id="height"
+                        name="height"
+                        type="number"
+                        min={80}
+                        max={250}
+                        value={height}
+                        onChange={(e) => setHeight(Number(e.target.value) || 0)}
+                        className="h-11 rounded-xl bg-card shadow-xs"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-muted/40 p-3.5 border border-border/50 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+                    <span>Physiologically Recommended Hydration</span>
+                    <span className="font-semibold text-foreground">
+                      {Math.round(weight * (selectedGender === "Female" ? 31 : selectedGender === "Male" ? 35 : 33))} ml / day (~{((weight * (selectedGender === "Female" ? 31 : selectedGender === "Male" ? 35 : 33)) / 1000).toFixed(1)} L)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div className="mt-8 pt-6 border-t border-border/60">
                 <h3 className="font-display text-lg font-bold tracking-tight">Daily Baseline Targets</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Personalize thresholds for your daily score ring.</p>
@@ -156,7 +278,7 @@ function ProfilePage() {
                       type="number"
                       min={500}
                       max={10000}
-                      defaultValue={profileData?.waterTarget || student.targets.water}
+                      defaultValue={profileData?.waterTarget || targets.water || student.targets.water}
                       className="h-10 rounded-xl bg-card"
                     />
                   </div>

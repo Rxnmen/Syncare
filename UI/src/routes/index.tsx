@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowRight, Check, Loader2, Plus, Sparkles, TrendingUp } from "lucide-react";
-import { useState, useMemo } from "react";
+import { ArrowRight, Check, Droplets, Loader2, Plus, Ruler, SlidersHorizontal, Sparkles, TrendingUp, UserRound, Weight } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { MetricCard } from "@/components/metric-card";
 import { OnboardingModal } from "@/components/onboarding-modal";
@@ -29,13 +29,60 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { userName, wellnessScore, metrics, todayLog, parseAndLog, isSyncing, requiresOnboarding, completeOnboarding } = useWellnessStore();
+  const {
+    userName,
+    wellnessScore,
+    metrics,
+    todayLog,
+    targets,
+    userGender,
+    userWeight,
+    userHeight,
+    bmi,
+    bmiCategory,
+    updateBodyMetrics,
+    parseAndLog,
+    isSyncing,
+    requiresOnboarding,
+    completeOnboarding,
+  } = useWellnessStore();
+
   const [logFeedback, setLogFeedback] = useState<{ [key: string]: { message: string; success: boolean } }>({});
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [inputValues, setInputValues] = useState<{ [key: string]: string }>({});
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [showAiDialog, setShowAiDialog] = useState(false);
+
+  // Body Profile Dialog state
+  const [showBodyDialog, setShowBodyDialog] = useState(false);
+  const [bodyGender, setBodyGender] = useState(userGender);
+  const [bodyWeight, setBodyWeight] = useState(String(userWeight));
+  const [bodyHeight, setBodyHeight] = useState(String(userHeight));
+  const [bodySaving, setBodySaving] = useState(false);
+
+  useEffect(() => {
+    setBodyGender(userGender);
+    setBodyWeight(String(userWeight));
+    setBodyHeight(String(userHeight));
+  }, [userGender, userWeight, userHeight]);
+
+  const handleSaveBodyMetrics = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const w = parseFloat(bodyWeight);
+    const h = parseFloat(bodyHeight);
+    if (isNaN(w) || w < 20 || w > 300) return;
+    if (isNaN(h) || h < 80 || h > 250) return;
+
+    setBodySaving(true);
+    await updateBodyMetrics({
+      gender: bodyGender,
+      weight: w,
+      height: h,
+    });
+    setBodySaving(false);
+    setShowBodyDialog(false);
+  };
 
   const fetchAiInsight = async () => {
     setShowAiDialog(true);
@@ -45,9 +92,14 @@ function Index() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Today's biometric summary for student ${userName}: Water: ${todayLog.water}ml, Steps: ${todayLog.steps}, Sleep: ${todayLog.sleep}hrs, Exercise: ${todayLog.exercise}mins, Score: ${wellnessScore}/100. Provide 2 targeted, highly practical recommendations for the rest of today to optimize recovery and study focus.`,
+          prompt: `Today's biometric summary for student ${userName} (Biological/Care Gender: ${userGender}, Body Weight: ${userWeight}kg, Height: ${userHeight}cm, BMI: ${bmi} [${bmiCategory}]): Water: ${todayLog.water}ml (Calibrated target: ${targets.water}ml), Steps: ${todayLog.steps} (Target: ${targets.steps}), Sleep: ${todayLog.sleep}hrs (Target: ${targets.sleep}h), Exercise: ${todayLog.exercise}mins, Score: ${wellnessScore}/100. Provide 2 targeted, highly practical recommendations tailored specifically to their gender, body mass index, recovery needs, and study focus.`,
           context: {
             user: userName,
+            gender: userGender,
+            weight: userWeight,
+            height: userHeight,
+            bmi,
+            bmiCategory,
             score: wellnessScore,
             log: { water: todayLog.water, steps: todayLog.steps, sleep: todayLog.sleep, exercise: todayLog.exercise },
           },
@@ -179,6 +231,127 @@ function Index() {
             </section>
           </Interactive3DCard>
         </div>
+      </ScrollReveal>
+
+      {/* Biometric Body Profile & Calibration Strip */}
+      <ScrollReveal direction="up" delayMs={75} distance={14}>
+        <section className="card-3d mt-6 p-5 rounded-2xl border border-border/80 bg-card/70 backdrop-blur-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-xs">
+                <UserRound className="size-6" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-display text-base font-bold text-foreground">Body Metrics & Analysis</h3>
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      bmiCategory === "Normal / Optimal"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                    }`}
+                  >
+                    BMI {bmi} · {bmiCategory}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>
+                    Gender: <strong className="text-foreground font-medium">{userGender}</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Weight: <strong className="text-foreground font-medium">{userWeight} kg</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Height: <strong className="text-foreground font-medium">{userHeight} cm</strong>
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="hidden xl:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-muted/40 border border-border/50 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Droplets className="size-3.5 text-blue-500" />
+                  Hydration Target: <strong className="text-foreground">{(targets.water / 1000).toFixed(1)} L/day</strong>
+                </span>
+              </div>
+
+              <Dialog open={showBodyDialog} onOpenChange={setShowBodyDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="tactile-btn gap-1.5 text-xs shadow-xs hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400">
+                    <SlidersHorizontal className="size-3.5" />
+                    Edit Biometrics
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="font-display text-xl">Edit Body Profile</DialogTitle>
+                    <DialogDescription>
+                      Update your gender, weight, and height to recalibrate personalized health baselines.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSaveBodyMetrics} className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Gender</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {["Male", "Female", "Non-Binary", "Other"].map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setBodyGender(g)}
+                            className={`p-2 rounded-lg border text-xs font-semibold transition-all ${
+                              bodyGender === g
+                                ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="body-weight-input" className="text-xs text-muted-foreground">Weight (kg)</Label>
+                        <Input
+                          id="body-weight-input"
+                          type="number"
+                          min="20"
+                          max="300"
+                          required
+                          value={bodyWeight}
+                          onChange={(e) => setBodyWeight(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="body-height-input" className="text-xs text-muted-foreground">Height (cm)</Label>
+                        <Input
+                          id="body-height-input"
+                          type="number"
+                          min="80"
+                          max="250"
+                          required
+                          value={bodyHeight}
+                          onChange={(e) => setBodyHeight(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="submit" disabled={bodySaving} className="tactile-btn w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                      {bodySaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      Save & Recalibrate Targets
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </section>
       </ScrollReveal>
 
       <ScrollReveal direction="up" delayMs={100} distance={12}>
@@ -325,6 +498,10 @@ function Index() {
             <DialogDescription>
               Real-time suggestions calculated from your logged sleep, water, and activity baselines.
             </DialogDescription>
+            <div className="flex flex-wrap items-center justify-between text-[11px] text-muted-foreground bg-muted/40 px-3 py-2 rounded-xl border border-border/60 mt-1">
+              <span className="font-medium text-foreground">Body Profile: {userGender} · {userWeight} kg · {userHeight} cm</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">BMI {bmi} ({bmiCategory})</span>
+            </div>
           </DialogHeader>
 
           <div className="py-3">

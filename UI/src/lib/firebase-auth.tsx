@@ -17,6 +17,9 @@ export interface StudentProfileData {
   fullName: string;
   age: number;
   city: string;
+  gender?: string;
+  weight?: number; // in kg
+  height?: number; // in cm
   waterTarget?: number;
   stepsTarget?: number;
   sleepTarget?: number;
@@ -32,7 +35,7 @@ interface FirebaseAuthContextType {
   signUpWithEmail: (
     email: string,
     password: string,
-    profile: { fullName: string; age: number; city: string }
+    profile: { fullName: string; age: number; city: string; gender?: string; weight?: number; height?: number }
   ) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -61,6 +64,9 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
       fullName: student.name,
       age: student.age,
       city: student.city,
+      gender: (student as any).gender || "Not specified",
+      weight: (student as any).weight || 65,
+      height: (student as any).height || 170,
       waterTarget: student.targets.water,
       stepsTarget: student.targets.steps,
       sleepTarget: student.targets.sleep,
@@ -88,6 +94,9 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
               fullName: currentUser.displayName || student.name,
               age: student.age,
               city: student.city,
+              gender: "Not specified",
+              weight: 65,
+              height: 170,
               waterTarget: student.targets.water,
               stepsTarget: student.targets.steps,
               sleepTarget: student.targets.sleep,
@@ -97,6 +106,9 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
               fullName: currentUser.displayName || currentGuest.fullName || student.name,
               age: currentGuest.age || student.age,
               city: currentGuest.city || student.city,
+              gender: currentGuest.gender || "Not specified",
+              weight: currentGuest.weight || 65,
+              height: currentGuest.height || 170,
               waterTarget: currentGuest.waterTarget || student.targets.water,
               stepsTarget: currentGuest.stepsTarget || student.targets.steps,
               sleepTarget: currentGuest.sleepTarget || student.targets.sleep,
@@ -138,11 +150,14 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = async (
     email: string,
     password: string,
-    profile: { fullName: string; age: number; city: string }
+    profile: { fullName: string; age: number; city: string; gender?: string; weight?: number; height?: number }
   ) => {
     const cleanName = sanitizeText(profile.fullName, 100);
     const cleanCity = sanitizeText(profile.city, 100);
     const cleanAge = clampNumber(profile.age, 13, 100, 19);
+    const cleanGender = profile.gender ? sanitizeText(profile.gender, 30) : "Not specified";
+    const cleanWeight = profile.weight && profile.weight > 0 ? Number(profile.weight) : 65;
+    const cleanHeight = profile.height && profile.height > 0 ? Number(profile.height) : 170;
 
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     if (cred.user) {
@@ -155,6 +170,9 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
           fullName: cleanName || student.name,
           age: cleanAge,
           city: cleanCity || student.city,
+          gender: cleanGender,
+          weight: cleanWeight,
+          height: cleanHeight,
           waterTarget: student.targets.water,
           stepsTarget: student.targets.steps,
           sleepTarget: student.targets.sleep,

@@ -57,6 +57,9 @@ export interface OnboardingMetrics {
   sleep: number;
   exercise: number;
   mood: string;
+  gender?: string;
+  weight?: number;
+  height?: number;
   study?: number;
 }
 
@@ -86,6 +89,12 @@ interface WellnessContextType {
   userName: string;
   userInitials: string;
   userCity: string;
+  userGender: string;
+  userWeight: number;
+  userHeight: number;
+  bmi: number;
+  bmiCategory: string;
+  updateBodyMetrics: (metrics: { gender?: string; weight?: number; height?: number }) => Promise<void>;
   requiresOnboarding: boolean;
   completeOnboarding: (metrics: OnboardingMetrics) => Promise<void>;
   setUserCity: (city: string) => Promise<void>;
@@ -151,7 +160,7 @@ function sanitizeLog(raw: any, dateKey: string): DailyWellnessLog {
 }
 
 export function WellnessProvider({ children }: { children: ReactNode }) {
-  const { user, profileData } = useFirebaseAuth();
+  const { user, profileData, updateUserProfileData } = useFirebaseAuth();
   const todayKey = getTodayDateKey();
 
   const [todayLog, setTodayLog] = useState<DailyWellnessLog>(() => {
@@ -210,14 +219,53 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     return "";
   });
 
-  // Targets derived from active profile or defaults
-  const targets: WellnessTargets = useMemo(() => ({
-    water: profileData?.waterTarget || student.targets.water,
-    steps: profileData?.stepsTarget || student.targets.steps,
-    sleep: profileData?.sleepTarget || student.targets.sleep,
-    exercise: 60,
-    study: 4,
-  }), [profileData]);
+  const userGender = profileData?.gender || "Not specified";
+  const userWeight = profileData?.weight && profileData.weight > 0 ? profileData.weight : 65;
+  const userHeight = profileData?.height && profileData.height > 0 ? profileData.height : 170;
+
+  // Body Mass Index (BMI) calculation
+  const bmi = useMemo(() => {
+    if (!userWeight || !userHeight) return 0;
+    const h = userHeight / 100;
+    return Number((userWeight / (h * h)).toFixed(1));
+  }, [userWeight, userHeight]);
+
+  const bmiCategory = useMemo(() => {
+    if (!bmi) return "Not calibrated";
+    if (bmi < 18.5) return "Underweight";
+    if (bmi < 25) return "Normal / Optimal";
+    if (bmi < 30) return "Overweight";
+    return "Obese";
+  }, [bmi]);
+
+  // Targets physiologically calibrated by weight & gender or explicit profile overrides
+  const targets: WellnessTargets = useMemo(() => {
+    let calibratedWater = profileData?.waterTarget;
+    if (!calibratedWater) {
+      if (userGender === "Male") calibratedWater = Math.round(userWeight * 35);
+      else if (userGender === "Female") calibratedWater = Math.round(userWeight * 31);
+      else calibratedWater = Math.round(userWeight * 33);
+    }
+
+    return {
+      water: calibratedWater || student.targets.water,
+      steps: profileData?.stepsTarget || student.targets.steps,
+      sleep: profileData?.sleepTarget || student.targets.sleep,
+      exercise: 60,
+      study: 4,
+    };
+  }, [profileData, userGender, userWeight]);
+
+  const updateBodyMetrics = useCallback(
+    async (m: { gender?: string; weight?: number; height?: number }) => {
+      await updateUserProfileData({
+        ...(m.gender ? { gender: m.gender } : {}),
+        ...(m.weight && m.weight > 0 ? { weight: Number(m.weight) } : {}),
+        ...(m.height && m.height > 0 ? { height: Number(m.height) } : {}),
+      });
+    },
+    [updateUserProfileData]
+  );
 
   // Load from Firestore when user authenticates
   useEffect(() => {
@@ -377,12 +425,19 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     [user, todayKey]
   );
 
-  // Complete onboarding by writing starting metrics
   const completeOnboarding = useCallback(
     async (initialMetrics: OnboardingMetrics) => {
       let stress: "Low" | "Moderate" | "High" = "Moderate";
       if (initialMetrics.mood === "Energized" || initialMetrics.mood === "Calm") stress = "Low";
       else if (initialMetrics.mood === "Tired") stress = "High";
+
+      if (initialMetrics.gender || (initialMetrics.weight && initialMetrics.weight > 0) || (initialMetrics.height && initialMetrics.height > 0)) {
+        await updateBodyMetrics({
+          gender: initialMetrics.gender,
+          weight: initialMetrics.weight,
+          height: initialMetrics.height,
+        });
+      }
 
       const newLog: DailyWellnessLog = {
         date: todayKey,
@@ -875,6 +930,12 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         userName,
         userInitials,
         userCity,
+        userGender,
+        userWeight,
+        userHeight,
+        bmi,
+        bmiCategory,
+        updateBodyMetrics,
         requiresOnboarding,
         completeOnboarding,
         setUserCity,

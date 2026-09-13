@@ -22,6 +22,9 @@ export const student = {
   name: "Rxnmenn",
   city: "SRM Kattankulathur",
   age: 19,
+  gender: "Not specified",
+  weight: 65,
+  height: 170,
   initials: "RN",
   targets: {
     water: 2500,
